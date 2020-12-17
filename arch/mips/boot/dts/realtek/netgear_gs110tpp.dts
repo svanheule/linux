@@ -3,6 +3,9 @@
 
 #include "rtl83xx.dtsi"
 
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
 / {
 	compatible = "netgear,gs110tpp-v1", "realtek,rtl83xx-soc";
 	model = "Netgear GS110TPP";
@@ -14,6 +17,22 @@
 	memory@0 {
 		device_type = "memory";
 		reg = <0x0 0x8000000>;
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	gpio-restart {
+		compatible = "gpio-restart";
+		gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+		priority = <192>;
+		open-source;
 	};
 };
 
