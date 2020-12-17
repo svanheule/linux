@@ -73,6 +73,20 @@
 			interrupt-controller;
 			reg = <0x3000 0x20>;
 		};
+
+		gpio0: gpio@3500 {
+			compatible = "realtek,realtek-gpio";
+			reg = <0x3500 0x1c>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+			ngpios = <24>;
+
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			interrupt-parent = <&rtlintc>;
+			interrupts = <23>;
+		};
 	};
 
 	switch_bus: switch-bus@bb000000 {
