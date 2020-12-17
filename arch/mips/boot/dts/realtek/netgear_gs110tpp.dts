@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl83xx.dtsi"
+
+/ {
+	compatible = "netgear,gs110tpp-v1", "realtek,rtl83xx-soc";
+	model = "Netgear GS110TPP";
+
+	chosen {
+		bootargs = "console=ttyS0,115200";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&spiflash {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0000000 0x0e0000>;
+				read-only;
+			};
+			partition@e0000 {
+				label = "u-boot-env";
+				reg = <0x00e0000 0x010000>;
+				read-only;
+			};
+			partition@f0000 {
+				label = "sysinfo";
+				reg = <0x00f0000 0x010000>;
+				read-only;
+			};
+			partition@100000 {
+				label = "jffs2_cfg";
+				reg = <0x0100000 0x100000>;
+				read-only;
+			};
+			partition@200000 {
+				label = "jffs2_log";
+				reg = <0x0200000 0x100000>;
+				read-only;
+			};
+			partition@300000 {
+				label = "runtime1";
+				reg = <0x0300000 0xe80000>;
+			};
+			partition@11800000 {
+				label = "runtime2";
+				reg = <0x1180000 0xe80000>;
+			};
+		};
+	};
+};
