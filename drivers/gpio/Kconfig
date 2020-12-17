@@ -501,6 +501,16 @@ config GPIO_RDA
 	help
 	  Say Y here to support RDA Micro GPIO controller.
 
+config GPIO_REALTEK
+	tristate "Realtek GPIO support"
+	depends on MACH_REALTEK
+	depends on OF_GPIO
+	default MACH_REALTEK
+	select GPIO_GENERIC
+	select GPIOLIB_IRQCHIP
+	help
+	  Say Yes here to support Realtek GPIO controllers.
+
 config GPIO_REG
 	bool
 	help
