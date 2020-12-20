@@ -445,7 +445,6 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 	u32 leds_per_port, led_cfg;
 	int err;
 	unsigned led_set, led_set_index, led_cfg_shift;
-	bool is_led, is_multi_led;
 
 	child_count = of_get_child_count(np);
 	dev_dbg(ctrl->dev, "port-led %d children\n", child_count);
@@ -488,26 +487,23 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 		if (of_n_addr_cells(child) != 2 || of_n_size_cells(child) != 0) {
 			dev_err(ctrl->dev, "#address-cells (%d) is not 2 or #size-cells (%d) is not 0\n",
 				(u32) of_n_addr_cells(child), (u32) of_n_size_cells(child));
+			of_node_put(child);
 			return -EINVAL;
 		}
 
-		is_led = of_node_name_prefix(child, "led");
-		is_multi_led = of_node_name_prefix(child, "multi-led");
-
-		if (is_led) {
+		if (of_node_name_prefix(child, "led")) {
 			err = realtek_port_led_probe_single(ctrl, child);
 			if (err)
-				return err;
+				dev_warn(ctrl->dev, "failed to register node\n");
 			continue;
 		}
-		else if (is_multi_led) {
+		else if (of_node_name_prefix(child, "multi-led")) {
 			dev_info(ctrl->dev, "found multi-led node\n");
 
 			err = realtek_port_led_probe_multi(ctrl, child,
 				leds_per_port);
 			if (err)
-				return err;
-
+				dev_warn(ctrl->dev, "failed to register node\n");
 			continue;
 		}
 
