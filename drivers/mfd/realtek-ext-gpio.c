@@ -164,7 +164,7 @@ struct realtek_port_led {
 	const struct led_port_modes *modes;
 	struct regmap *map;
 	unsigned int reg;
-	unsigned int offset;
+	unsigned int index;
 };
 
 static const struct led_port_modes rtl8380_port_led_modes = {
@@ -191,8 +191,9 @@ static const struct led_port_modes rtl8390_port_led_modes = {
 static void realtek_port_led_set_mode(const struct realtek_port_led *pled,
 	unsigned int mode)
 {
-	regmap_update_bits(pled->map, pled->reg, (0x7 << pled->offset),
-		((mode & 0x7) << pled->offset));
+	int offset = 3*pled->index;
+	regmap_update_bits(pled->map, pled->reg, (0x7 << offset),
+		((mode & 0x7) << offset));
 }
 
 static void realtek_port_led_brightness_set(struct led_classdev *led_cdev,
@@ -216,7 +217,7 @@ static enum led_brightness realtek_port_led_brightness_get(
 	u32 val;
 
 	regmap_read(pled->map, pled->reg, &val);
-	current_mode = (val >> pled->offset) & 0x7;
+	current_mode = (val >> 3*pled->index) & 0x7;
 
 	if (current_mode == pled->modes->off)
 		return LED_OFF;
@@ -296,7 +297,7 @@ static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
 	port_led->map = ctrl->map;
 	port_led->modes = ctrl->data->port_modes;
 	port_led->reg = ctrl->data->port_mode_base + 4*port_index;
-	port_led->offset = 3*led_index;
+	port_led->index = led_index;
 
 	port_led->led.max_brightness = 1;
 	port_led->led.brightness_set = realtek_port_led_brightness_set;
@@ -305,7 +306,7 @@ static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
 
 	/* Enable LED management and mark as software managed */
 	dev_dbg(ctrl->dev, "registering port led %d.%d: reg=%08x, mask=%08x\n",
-		port_index, led_index, port_led->reg, 0x7 << port_led->offset);
+		port_index, led_index, port_led->reg, 0x7 << 3*port_led->index);
 	// TODO Use generic register offsets
 	port_mask = BIT(port_index);
 	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_EN,
@@ -334,7 +335,7 @@ static void realtek_port_led_read_address(struct device_node *np,
 
 struct realtek_port_subled {
 	unsigned int reg;
-	unsigned int offset;
+	unsigned int index;
 };
 
 struct realtek_port_multi_led {
@@ -410,7 +411,7 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 		// TODO check port and port_led values
 		realtek_port_led_read_address(sub_np, &port, &port_led);
 		subled->reg = ctrl->data->port_mode_base + port;
-		subled->offset = port_led*3;
+		subled->index = port_led;
 
 		subled_info++;
 		subled++;
