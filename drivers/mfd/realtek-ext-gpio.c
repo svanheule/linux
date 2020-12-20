@@ -392,10 +392,10 @@ static int realtek_port_led_probe_multi(struct realtek_eio_ctrl *ctrl,
 	if (!mled)
 		return -ENOMEM;
 
-	subled = devm_kzalloc(ctrl->dev,
-		sizeof(*subled)*subled_count, GFP_KERNEL);
-	subled_info = devm_kzalloc(ctrl->dev,
-		sizeof(*subled_info)*subled_count, GFP_KERNEL);
+	subled = devm_kcalloc(ctrl->dev, subled_count,
+		sizeof(*subled), GFP_KERNEL);
+	subled_info = devm_kcalloc(ctrl->dev, subled_count,
+		sizeof(*subled_info), GFP_KERNEL);
 
 	if (!subled_info || !subled)
 		return -ENOMEM;
