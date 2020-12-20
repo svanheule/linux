@@ -439,7 +439,7 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 {
 	struct device_node *child;
 	int child_count, match_condition_count;
-	u32 leds_per_port, port_index, led_index, led_cfg;
+	u32 leds_per_port, led_cfg;
 	int err;
 	unsigned led_set, led_set_index, led_cfg_shift;
 	bool is_led, is_multi_led;
@@ -460,6 +460,8 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 		return -EINVAL;
 	}
 
+	// TODO clear P_EN/SW_P_EN registers before probing
+
 	// TODO Make the number of led sets variable
 	match_condition_count = of_property_count_u32_elems(np, "realtek,hardware-match-condition");
 	if (match_condition_count != leds_per_port*2) {
@@ -475,7 +477,7 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 			of_property_read_u32_index(np, "realtek,hardware-match-condition", led_set_index+leds_per_port*led_set, &led_cfg);
 			regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_MODE,
 				0x1f << led_cfg_shift,
-				(led_cfg & 0x1f) << led_cfg_shift);
+				led_cfg << led_cfg_shift);
 		}
 	}
 
@@ -488,8 +490,6 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 
 		is_led = of_node_name_prefix(child, "led");
 		is_multi_led = of_node_name_prefix(child, "multi-led");
-
-		realtek_port_led_read_address(child, &port_index, &led_index);
 
 		if (is_led) {
 			err = realtek_port_led_probe_single(ctrl, child);
