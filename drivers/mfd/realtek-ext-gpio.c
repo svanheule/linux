@@ -286,6 +286,7 @@ static int realtek_port_led_probe_single(struct realtek_eio_ctrl *ctrl,
 	unsigned int port_index, led_index;
 	struct led_init_data init_data = {};
 	u32 port_mask;
+	int err;
 
 	realtek_port_led_read_address(np, &port_index, &led_index);
 	port_mask = BIT(port_index);
@@ -311,20 +312,21 @@ static int realtek_port_led_probe_single(struct realtek_eio_ctrl *ctrl,
 	port_led->led.brightness_get = realtek_port_led_brightness_get;
 	port_led->led.blink_set = realtek_port_led_blink_set;
 
-	/* Enable LED management and mark as software managed */
 	dev_dbg(ctrl->dev, "registering port led %d.%d: reg=%08x, mask=%08x\n",
 		port_index, led_index, port_led->info.reg,
 		0x7 << 3*port_led->info.index);
+
+	// TODO private triggers?
+	err = devm_led_classdev_register_ext(ctrl->dev, &port_led->led,
+		&init_data);
+	if (err)
+		return err;
+
 	// TODO Use generic register offsets
 	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_SOFT_EN(led_index),
 		port_mask, port_mask);
 
-	// TODO private triggers?
-
-	devm_led_classdev_register_ext(ctrl->dev, &port_led->led, &init_data);
-
 port_led_simple_enable:
-	// TODO Use generic register offsets
 	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_EN,
 		port_mask, port_mask);
 
