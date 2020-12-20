@@ -159,12 +159,16 @@ static int realtek_sys_led_probe(struct realtek_eio_ctrl *ctrl,
  * matching conditions. Alternatively, each individual LED output can also be
  * configured for manual control.
  */
+struct realtek_port_led_info {
+	unsigned int reg;
+	unsigned int index;
+};
+
 struct realtek_port_led {
 	struct led_classdev led;
 	const struct led_port_modes *modes;
 	struct regmap *map;
-	unsigned int reg;
-	unsigned int index;
+	struct realtek_port_led_info info;
 };
 
 static const struct led_port_modes rtl8380_port_led_modes = {
@@ -188,12 +192,13 @@ static const struct led_port_modes rtl8390_port_led_modes = {
 		  {1024, 6}}
 };
 
-static void realtek_port_led_set_mode(const struct realtek_port_led *pled,
-	unsigned int mode)
+static inline int realtek_port_led_set_mode(struct regmap *map,
+	const struct realtek_port_led_info *info, unsigned mode)
 {
-	int offset = 3*pled->index;
-	regmap_update_bits(pled->map, pled->reg, (0x7 << offset),
-		((mode & 0x7) << offset));
+	int offset = 3*info->index;
+
+	return regmap_update_bits(map, info->reg,
+		0x7 << offset, mode << offset);
 }
 
 static void realtek_port_led_brightness_set(struct led_classdev *led_cdev,
@@ -203,9 +208,11 @@ static void realtek_port_led_brightness_set(struct led_classdev *led_cdev,
 		container_of(led_cdev, struct realtek_port_led, led);
 
 	if (brightness)
-		realtek_port_led_set_mode(pled, pled->modes->on);
+		realtek_port_led_set_mode(pled->map, &pled->info,
+			pled->modes->on);
 	else
-		realtek_port_led_set_mode(pled, pled->modes->off);
+		realtek_port_led_set_mode(pled->map, &pled->info,
+			pled->modes->off);
 }
 
 static enum led_brightness realtek_port_led_brightness_get(
@@ -216,8 +223,8 @@ static enum led_brightness realtek_port_led_brightness_get(
 	unsigned int current_mode;
 	u32 val;
 
-	regmap_read(pled->map, pled->reg, &val);
-	current_mode = (val >> 3*pled->index) & 0x7;
+	regmap_read(pled->map, pled->info.reg, &val);
+	current_mode = (val >> 3*pled->info.index) & 0x7;
 
 	if (current_mode == pled->modes->off)
 		return LED_OFF;
@@ -238,11 +245,13 @@ static int realtek_port_led_blink_set(struct led_classdev *led_cdev,
 		blink_interval = 512;
 	}
 	else if (*delay_on == 0) {
-		realtek_port_led_set_mode(pled, pled->modes->off);
+		realtek_port_led_set_mode(pled->map, &pled->info,
+			pled->modes->off);
 		return 0;
 	}
 	else if (*delay_off == 0) {
-		realtek_port_led_set_mode(pled, pled->modes->on);
+		realtek_port_led_set_mode(pled->map, &pled->info,
+			pled->modes->on);
 		return 0;
 	}
 
@@ -256,7 +265,8 @@ static int realtek_port_led_blink_set(struct led_classdev *led_cdev,
 
 	*delay_on = modes[i].interval;
 	*delay_off = modes[i].interval;
-	realtek_port_led_set_mode(pled, modes[i].mode);
+	realtek_port_led_set_mode(pled->map, &pled->info,
+		modes[i].mode);
 
 	return 0;
 }
@@ -296,8 +306,8 @@ static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
 	
 	port_led->map = ctrl->map;
 	port_led->modes = ctrl->data->port_modes;
-	port_led->reg = ctrl->data->port_mode_base + 4*port_index;
-	port_led->index = led_index;
+	port_led->info.reg = ctrl->data->port_mode_base + 4*port_index;
+	port_led->info.index = led_index;
 
 	port_led->led.max_brightness = 1;
 	port_led->led.brightness_set = realtek_port_led_brightness_set;
@@ -306,7 +316,8 @@ static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
 
 	/* Enable LED management and mark as software managed */
 	dev_dbg(ctrl->dev, "registering port led %d.%d: reg=%08x, mask=%08x\n",
-		port_index, led_index, port_led->reg, 0x7 << 3*port_led->index);
+		port_index, led_index, port_led->info.reg,
+		0x7 << 3*port_led->info.index);
 	// TODO Use generic register offsets
 	port_mask = BIT(port_index);
 	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_EN,
@@ -333,17 +344,12 @@ static void realtek_port_led_read_address(struct device_node *np,
 	}
 }
 
-struct realtek_port_subled {
-	unsigned int reg;
-	unsigned int index;
-};
-
 struct realtek_port_multi_led {
 	struct led_classdev_mc mc_cdev;
 	struct regmap *map;
 	int led_count;
 	struct mc_subled *subled_info;
-	struct realtek_port_subled *leds;
+	struct realtek_port_led_info *leds;
 };
 
 static void bicolor_led_brightness_set(struct led_classdev *cdev,
@@ -359,7 +365,7 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 	struct realtek_port_multi_led *mled;
 	struct led_classdev *led_cdev;
 	struct mc_subled *subled_info;
-	struct realtek_port_subled *subled;
+	struct realtek_port_led_info *subled;
 	struct device_node *sub_np;
 	unsigned channel;
 	int subled_count;
@@ -382,9 +388,9 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 		return -ENOMEM;
 
 	subled = devm_kzalloc(ctrl->dev,
-	       sizeof(*subled)*subled_count, GFP_KERNEL);
+		sizeof(*subled)*subled_count, GFP_KERNEL);
 	subled_info = devm_kzalloc(ctrl->dev,
-	       sizeof(*subled_info)*subled_count, GFP_KERNEL);
+		sizeof(*subled_info)*subled_count, GFP_KERNEL);
 
 	if (!subled_info || !subled)
 		return -ENOMEM;
