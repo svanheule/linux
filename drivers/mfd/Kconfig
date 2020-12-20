@@ -985,6 +985,15 @@ config MFD_RETU
 	  Retu and Tahvo are a multi-function devices found on Nokia
 	  Internet Tablets (770, N800 and N810).
 
+config MFD_REALTEK_EIO
+	tristate "Realtek external LED and GPIO driver"
+	select MFD_SYSCON
+	depends on MACH_REALTEK
+	default MACH_REALTEK
+	help
+	  Say yes here if you want external LED/GPIO support for Realtek
+	  switch SoCs.
+
 config MFD_PCF50633
 	tristate "NXP PCF50633"
 	depends on I2C
