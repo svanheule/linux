@@ -267,30 +267,31 @@ static int realtek_port_led_blink_set(struct led_classdev *led_cdev,
 	return 0;
 }
 
-static int realtek_port_led_hw(struct realtek_eio_ctrl *ctrl,
-	struct device_node *np,	unsigned int port_index,
-	unsigned int led_index)
+static void realtek_port_led_read_address(struct device_node *np,
+	int *port_index, int *led_index)
 {
-	u32 port_mask;
+	const __be32 *addr;
 
-	/* Enable LED management */
-	dev_dbg(ctrl->dev, "registering hardware port led %d.%d\n",
-		port_index, led_index);
-	// TODO Use generic register offsets
-	port_mask = BIT(port_index);
-	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_EN,
-		port_mask, port_mask);
-
-	return 0;
+	addr = of_get_address(np, 0, NULL, NULL);
+	if (addr) {
+		*port_index = of_read_number(addr, 1);
+		*led_index = of_read_number(addr+1, 1);
+	}
 }
 
-static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
-	struct device_node *np,	unsigned int port_index,
-	unsigned int led_index)
+static int realtek_port_led_probe_single(struct realtek_eio_ctrl *ctrl,
+	struct device_node *np)
 {
 	struct realtek_port_led *port_led;
+	unsigned int port_index, led_index;
 	struct led_init_data init_data = {};
 	u32 port_mask;
+
+	realtek_port_led_read_address(np, &port_index, &led_index);
+	port_mask = BIT(port_index);
+
+	if (of_property_read_bool(np, "realtek,hardware-managed"))
+		goto port_led_simple_enable;
 
 	port_led = devm_kzalloc(ctrl->dev, sizeof(*port_led), GFP_KERNEL);
 	if (!port_led) {
@@ -299,7 +300,7 @@ static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
 	}
 
 	init_data.fwnode = of_fwnode_handle(np);
-	
+
 	port_led->map = ctrl->map;
 	port_led->modes = ctrl->data->port_modes;
 	port_led->info.reg = ctrl->data->port_mode_base + 4*port_index;
@@ -315,9 +316,6 @@ static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
 		port_index, led_index, port_led->info.reg,
 		0x7 << 3*port_led->info.index);
 	// TODO Use generic register offsets
-	port_mask = BIT(port_index);
-	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_EN,
-		port_mask, port_mask);
 	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_SOFT_EN(led_index),
 		port_mask, port_mask);
 
@@ -325,19 +323,12 @@ static int realtek_port_led_sw_single(struct realtek_eio_ctrl *ctrl,
 
 	devm_led_classdev_register_ext(ctrl->dev, &port_led->led, &init_data);
 
+port_led_simple_enable:
+	// TODO Use generic register offsets
+	regmap_update_bits(ctrl->map, RTL8380_EIO_PORT_LED_EN,
+		port_mask, port_mask);
+
 	return 0;
-}
-
-static void realtek_port_led_read_address(struct device_node *np,
-	int *port_index, int *led_index)
-{
-	const __be32 *addr;
-
-	addr = of_get_address(np, 0, NULL, NULL);
-	if (addr) {
-		*port_index = of_read_number(addr, 1);
-		*led_index = of_read_number(addr+1, 1);
-	}
 }
 
 struct realtek_port_multi_led {
@@ -364,7 +355,7 @@ static void bicolor_led_brightness_set(struct led_classdev *cdev,
 	}
 }
 
-static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
+static int realtek_port_led_probe_multi(struct realtek_eio_ctrl *ctrl,
 	struct device_node *np, int max_sub_led)
 {
 	struct led_init_data init_data = {};
@@ -377,6 +368,12 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 	int subled_count;
 	int port, port_led;
 	int err;
+
+	if (of_property_read_bool(np, "realtek,hardware-managed")) {
+		dev_warn(ctrl->dev,
+			"hardware managed multi-led not supported\n");
+		return -ENODEV;
+	}
 
 	subled_count = of_get_child_count(np);
 
@@ -411,9 +408,6 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 	channel = 0;
 
 	for_each_child_of_node(np, sub_np) {
-		port = -1;
-		port_led = -1;
-
 		subled_info->channel = channel++;
 		of_property_read_u32(sub_np, "color",
 			&subled_info->color_index);
@@ -442,7 +436,6 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 {
 	struct device_node *child;
 	int child_count, match_condition_count;
-	const __be32 *addr;
 	u32 leds_per_port, port_index, led_index, led_cfg;
 	int err;
 	unsigned led_set, led_set_index, led_cfg_shift;
@@ -493,27 +486,19 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 		is_led = of_node_name_prefix(child, "led");
 		is_multi_led = of_node_name_prefix(child, "multi-led");
 
-		addr = of_get_address(child, 0, NULL, NULL);
-		port_index = of_read_number(addr, 1);
-		led_index = of_read_number(addr+1, 1);
+		realtek_port_led_read_address(child, &port_index, &led_index);
 
 		if (is_led) {
-			if (of_property_read_bool(child, "realtek,hardware-managed"))
-				err = realtek_port_led_hw(ctrl, child,
-					port_index, led_index);
-			else
-				err = realtek_port_led_sw_single(ctrl, child,
-					port_index, led_index);
+			err = realtek_port_led_probe_single(ctrl, child);
 			if (err)
 				return err;
-
 			continue;
 		}
 		else if (is_multi_led) {
-			if (of_property_read_bool(child, "realtek,hardware-managed"))
-				goto hw_managed_multi_not_supported;
+			dev_info(ctrl->dev, "found multi-led node\n");
 
-			err = realtek_port_led_sw_multi(ctrl, child, leds_per_port);
+			err = realtek_port_led_probe_multi(ctrl, child,
+				leds_per_port);
 			if (err)
 				return err;
 
@@ -522,11 +507,6 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 
 		dev_dbg(ctrl->dev, "skipping unsupported led-port node %s\n",
 			of_node_full_name(child));
-		continue;
-
-hw_managed_multi_not_supported:
-		dev_warn(ctrl->dev, "hardware managed multi-led not supported\n");
-		continue;
 	}
 
 	return 0;
