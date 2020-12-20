@@ -378,6 +378,7 @@ static int realtek_port_led_probe_multi(struct realtek_eio_ctrl *ctrl,
 	}
 
 	subled_count = of_get_child_count(np);
+	dev_info(ctrl->dev, "found %d sub led nodes\n", subled_count);
 
 	if (!subled_count) {
 		dev_warn(ctrl->dev, "no LEDs defined\n");
