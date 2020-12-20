@@ -398,10 +398,11 @@ static int realtek_port_led_probe_multi(struct realtek_eio_ctrl *ctrl,
 	if (!subled_info || !subled)
 		return -ENOMEM;
 
+	mled->map = ctrl->map;
+	mled->modes = ctrl->data->port_modes;
 	mled->leds = subled;
 	mled->mc_cdev.subled_info = subled_info;
 	mled->mc_cdev.num_colors = subled_count;
-	mled->modes = ctrl->data->port_modes;
 
 	init_data.fwnode = of_fwnode_handle(np);
 
@@ -427,7 +428,9 @@ static int realtek_port_led_probe_multi(struct realtek_eio_ctrl *ctrl,
 
 	err = devm_led_classdev_multicolor_register_ext(ctrl->dev,
 		&mled->mc_cdev, &init_data);
-	
+
+	if (err)
+	    dev_err(ctrl->dev, "failed to register multi-led\n");
 	return err;
 }
 
