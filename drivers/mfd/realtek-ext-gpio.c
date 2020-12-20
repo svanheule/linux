@@ -350,7 +350,18 @@ struct realtek_port_multi_led {
 static void bicolor_led_brightness_set(struct led_classdev *cdev,
 	enum led_brightness brightness)
 {
+	struct led_classdev_mc *mc_cdev = lcdev_to_mccdev(cdev);
+	struct realtek_port_multi_led *ml = container_of(mc_cdev,
+		struct realtek_port_multi_led, mc_cdev);
+	unsigned l, mode;
 
+	led_mc_calc_color_components(mc_cdev, brightness);
+
+	for (l = 0; l < mc_cdev->num_colors; l++) {
+		mode = mc_cdev->subled_info[l].brightness ?
+			ml->modes->on : ml->modes->off;
+		realtek_port_led_set_mode(ml->map, &ml->leds[l], mode);
+	}
 }
 
 static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
