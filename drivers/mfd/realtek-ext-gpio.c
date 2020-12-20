@@ -206,13 +206,9 @@ static void realtek_port_led_brightness_set(struct led_classdev *led_cdev,
 {
 	struct realtek_port_led *pled =
 		container_of(led_cdev, struct realtek_port_led, led);
+	int mode = brightness ? pled->modes->on : pled->modes->off;
 
-	if (brightness)
-		realtek_port_led_set_mode(pled->map, &pled->info,
-			pled->modes->on);
-	else
-		realtek_port_led_set_mode(pled->map, &pled->info,
-			pled->modes->off);
+	realtek_port_led_set_mode(pled->map, &pled->info, mode);
 }
 
 static enum led_brightness realtek_port_led_brightness_get(
