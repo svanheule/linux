@@ -343,8 +343,7 @@ static void realtek_port_led_read_address(struct device_node *np,
 struct realtek_port_multi_led {
 	struct led_classdev_mc mc_cdev;
 	struct regmap *map;
-	int led_count;
-	struct mc_subled *subled_info;
+	const struct led_port_modes *modes;
 	struct realtek_port_led_info *leds;
 };
 
@@ -392,7 +391,9 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 		return -ENOMEM;
 
 	mled->leds = subled;
-	mled->subled_info = subled_info;
+	mled->mc_cdev.subled_info = subled_info;
+	mled->mc_cdev.num_colors = subled_count;
+	mled->modes = ctrl->data->port_modes;
 
 	init_data.fwnode = of_fwnode_handle(np);
 
@@ -406,10 +407,6 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 		of_property_read_u32(sub_np, "color",
 			&subled_info->color_index);
 
-		/*
-		 * TODO Merge functionality with single leds, since a subled
-		 * and an independent led require the same logic anyway
-		 */
 		// TODO check port and port_led values
 		realtek_port_led_read_address(sub_np, &port, &port_led);
 		subled->reg = ctrl->data->port_mode_base + port;
@@ -419,19 +416,14 @@ static int realtek_port_led_sw_multi(struct realtek_eio_ctrl *ctrl,
 		subled++;
 	}
 
-	mled->mc_cdev.subled_info = subled_info;
-	mled->mc_cdev.num_colors = subled_count;
-
 	led_cdev = &(mled->mc_cdev.led_cdev);
 	led_cdev->max_brightness = 1;
 	led_cdev->brightness_set = bicolor_led_brightness_set;
 
 	err = devm_led_classdev_multicolor_register_ext(ctrl->dev,
 		&mled->mc_cdev, &init_data);
-	if (err)
-		return err;
-
-	return 0;
+	
+	return err;
 }
 
 static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
