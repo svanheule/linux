@@ -49,10 +49,7 @@
 
 &ext_io {
 	port-led {
-		/*
-		 * Address is PORT.LED, size indicates the number of LEDs
-		 * Use size 1 for single-color LED, 2 or 3 for multi-color LEDs
-		 */
+		/* Address is PORT.LED */
 		#address-cells = <2>;
 		#size-cells = <0>;
 

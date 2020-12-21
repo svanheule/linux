@@ -425,7 +425,7 @@ static int realtek_port_led_probe_multi(struct realtek_eio_ctrl *ctrl,
 		subled++;
 	}
 
-	led_cdev = &(mled->mc_cdev.led_cdev);
+	led_cdev = &mled->mc_cdev.led_cdev;
 	led_cdev->max_brightness = 1;
 	led_cdev->brightness_set = bicolor_led_brightness_set;
 
