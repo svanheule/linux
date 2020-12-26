@@ -23,6 +23,8 @@
 &switch_bus {
 	syscon@0 {
 		compatible = "syscon", "simple-mfd";
+		#address-cells = <1>;
+		#size-cells = <1>;
 		reg = <0x0 0x1028>;
 
 		sysreset@40 {
