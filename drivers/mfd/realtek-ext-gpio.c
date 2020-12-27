@@ -460,8 +460,6 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 		return -EINVAL;
 	}
 
-	// TODO clear P_EN/SW_P_EN registers before probing
-
 	// TODO Make the number of led sets variable
 	match_condition_count = of_property_count_u32_elems(np, "realtek,hardware-match-condition");
 	if (match_condition_count != leds_per_port*2) {
@@ -469,7 +467,7 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 		return -EINVAL;
 	}
 
-	ctrl->data->set_port_led_count(ctrl, leds_per_port);
+	ctrl->data->init(ctrl, leds_per_port);
 
 	for (led_set = 0; led_set < 2; led_set++) {
 		for (led_set_index = 0; led_set_index < leds_per_port; led_set_index++) {
@@ -512,13 +510,22 @@ static int realtek_port_led_probe(struct realtek_eio_ctrl *ctrl,
 	return 0;
 }
 
-static void rtl8380_port_led_set_count(struct realtek_eio_ctrl *ctrl,
-	unsigned int count)
+static void rtl8380_port_led_init(struct realtek_eio_ctrl *ctrl,
+	unsigned int led_count)
 {
-	u32 led_mask = BIT(count)-1;
+	u32 led_mask = BIT(led_count)-1;
+	u32 port_mask = BIT(ctrl->port_count)-1;
 
 	regmap_update_bits(ctrl->map, REALTEK_EIO_GLOBAL_CTRL,
 		0x3f, (led_mask << 3) | led_mask);
+
+	regmap_clear_bits(ctrl->map, RTL8380_EIO_PORT_LED_EN, port_mask);
+	regmap_clear_bits(ctrl->map, RTL8380_EIO_PORT_LED_SOFT_EN(0),
+		port_mask);
+	regmap_clear_bits(ctrl->map, RTL8380_EIO_PORT_LED_SOFT_EN(1),
+		port_mask);
+	regmap_clear_bits(ctrl->map, RTL8380_EIO_PORT_LED_SOFT_EN(2),
+		port_mask);
 }
 
 //static void rtl8390_port_led_set_count(struct realtek_eio_ctrl *ctrl,
@@ -539,7 +546,7 @@ static const struct realtek_eio_data rtl8380_eio_data = {
 	.port_count = 28,
 	.port_modes = &rtl8380_port_led_modes,
 	.port_mode_base = RTL8380_EIO_PORT_LED_SOFT_MODE(0),
-	.set_port_led_count = rtl8380_port_led_set_count
+	.init = rtl8380_port_led_init
 };
 
 //static struct realtek_eio_data rtl8390_eio_data = {
