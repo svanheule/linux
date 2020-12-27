@@ -1062,6 +1062,8 @@ choice
 
 	config DT_CISCO_SG220_26
 		bool "Cisco SG220-26"
+	config DT_NETGEAR_GS110TPP
+		bool "Netgear GS110TPP"
 endchoice
 endif
 
