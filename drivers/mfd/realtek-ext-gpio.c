@@ -147,9 +147,7 @@ static int realtek_sys_led_probe(struct realtek_eio_ctrl *ctrl,
 	sys_led->brightness_get = realtek_sys_led_brightness_get;
 	sys_led->blink_set = realtek_sys_led_blink_set;
 
-	devm_led_classdev_register_ext(parent, sys_led, &init_data);
-
-	return 0;
+	return devm_led_classdev_register_ext(parent, sys_led, &init_data);
 }
 
 /*
@@ -604,8 +602,17 @@ static int realtek_eio_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to get regmap\n");
 		return -EINVAL;
 	}
+
 	/* Parse optional sys-led child */
-	// TODO
+	np_sys_led = of_get_child_by_name(np, "sys-led");
+	if (IS_ERR(np_sys_led))
+		return PRT_ERR(np_sys_led);
+
+	if (np_sys_led) {
+		err = realtek_sys_led_probe(ctrl, dev, np_sys_led);
+		if (err)
+		    return err;
+	}
 
 	/* Parse optional port-led child */
 	np_port_led = of_get_child_by_name(np, "port-led");
