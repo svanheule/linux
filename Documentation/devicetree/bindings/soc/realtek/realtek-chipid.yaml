@@ -12,7 +12,14 @@ maintainers:
 
 description: |
   Realtek chipid driver uses the model name and chip revision registers to
-  identify the SoC.
+  identify the SoC. Since the relevant registers have evolved over different
+  SoC generations, a family may require access to more registers than others.
+  For all families, the (first) range specified by `reg` points to the chip
+  info registers.
+  For RTL838x, all chip info registers can only be read succesfully if they
+  can be unlocked. To this end, the register unlock register should be provided
+  as a second item in `reg`. Finally, to correctly identify all RTL8380-class
+  models, the 'MODE_DEFINE_CTL' register should be defined as a third item.
 
 properties:
   $nodename:
@@ -26,7 +33,25 @@ properties:
       - reatlek,rtl9310-chipid
 
   reg:
-    maxItems: 1
+    description:
+      List of register ranges used to identify the SoC
+
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: realtek,rtl8380-chipid
+    then:
+      properties:
+        reg:
+          minItems: 3
+          maxItems: 3
+    else:
+      properties:
+        reg:
+          minItems: 1
+          maxItems: 1
 
 required:
   - compatible
@@ -36,12 +61,14 @@ additionalProperties: false
 
 examples:
   - |
-    chipid@bb0000d0 {
+    chipid@d0 {
         compatible = "realtek,rtl8380-chipid";
-        reg = <0xbb0000d0 0x10>;
+        /* Specify chip info, register unlock, feature definition */
+        reg = <0x00d0 0x10>, <0x0058 0x4>, <0x1024 0x4>;
     };
   - |
     chipid@0 {
         compatible = "realtek,rtl9300-chipid";
+        /* Only specify chip info range */
         reg = <0x0000 0x8>;
     };
