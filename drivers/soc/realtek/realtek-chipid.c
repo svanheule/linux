@@ -30,6 +30,8 @@
 
 #define REALTEK_REG_PROTECT_READ	BIT(0)
 #define REALTEK_REG_PROTECT_WRITE	BIT(1)
+#define REALTEK_REG_PROTECT_READ_WRITE	\
+	(REALTEK_REG_PROTECT_READ | REALTEK_REG_PROTECT_WRITE)
 
 static inline int realtek_soc_id(u32 model)
 {
@@ -74,60 +76,96 @@ static const struct of_device_id of_realtek_chipid_match[] = {
 	{ /* sentinel */ }
 };
 
-static inline bool rtl8380_is_rtl8381(struct regmap *regmap, int base)
+static inline bool rtl8380_read_modelinfo(struct device *dev,
+	struct regmap *regmap, int chip_info_base, int *model,
+	int *chip_rev, bool *is_engineering_sample)
 {
+	int err, reg_rw_protect, reg_mode_define;
+	const __be32 *offset;
 	bool result;
-	u32 mode_define;
+	u32 mode_define, val_model;
 
-	if (!base)
-		return false;
+	/* FIXME restore register value */
+	offset = of_get_address(dev->of_node, 1, NULL, NULL);
+	if (!offset)
+		dev_warn(dev, "INT_RW register base address found\n");
+	else {
+		reg_rw_protect = __be32_to_cpu(*offset);
+		err = regmap_set_bits(regmap, reg_rw_protect,
+			REALTEK_REG_PROTECT_READ_WRITE);
+		if (err)
+		    return err;
+	}
+
+	err = regmap_read(regmap, chip_info_base + RTL8380_MODEL_NAME,
+		&val_model);
+	if (err)
+		return err;
+
+	err = regmap_read(regmap, chip_info_base + RTL8380_MODEL_EXT_VERSION,
+		chip_rev);
+	if (err)
+		return err;
 
 	/*
-	 * BIT(23) in RTL8380_MODE_DEFINE_CTL indicates if the SoC is RTL8380M (1)
-	 * or RTL8381M (0). The RTL8381M has only one QSGMII and two SGMII phys. To
-	 * be able to read the bit, the READ_ENABLE bit must first be set in the
-	 * register.
+	 * BIT(23) in RTL8380_MODE_DEFINE_CTL indicates if the SoC is 
+	 * RTL8380M (1) or RTL8381M (0). The RTL8381M has only one QSGMII
+	 * and two SGMII phys. To be able to read the bit, the READ_ENABLE
+	 * bit must first be set in the register. If enabling this bit
+	 * didn't work, just assume this isn't an RTL8381.
+	 * Correct the SoC-ID if the detection heuristics show this is an
+	 * RTL8381M.
 	 */
-	regmap_set_bits(regmap, base + RTL8380_MODE_DEFINE_CTRL, BIT(31));
-	result = !regmap_test_bits(regmap, base + RTL8380_MODE_DEFINE_CTRL,
-		BIT(23));
-	regmap_read(regmap, base + RTL8380_MODE_DEFINE_CTRL, &mode_define);
-	regmap_clear_bits(regmap, base + RTL8380_MODE_DEFINE_CTRL, BIT(31));
+	offset = of_get_address(dev->of_node, 2, NULL, NULL);
+	if (!offset) {
+		dev_warn(dev, "MODE_DEFINE_CTL register base address found\n");
+	}
+	else if (realtek_soc_id(val_model) == 0x8380) {
+		reg_mode_define = __be32_to_cpu(*offset);
+		regmap_set_bits(regmap, reg_mode_define, BIT(31));
+		result = regmap_test_bits(regmap, reg_mode_define, BIT(31));
+		result = result && !regmap_test_bits(regmap, reg_mode_define,
+			BIT(23));
+		regmap_read(regmap, reg_mode_define, &mode_define);
+		regmap_clear_bits(regmap, reg_mode_define, BIT(31));
 
-	return result;
+		if (result)
+			val_model = (val_model & 0xffff) | (0x8381 << 16);
+	}
+
+	*model = val_model;
+
+	return 0;
 }
 
-static int realtek_read_modelinfo(struct regmap *regmap, int family_id,
-	int chip_info_base, int rw_protect_base, int mode_define_base,
+static int realtek_read_modelinfo(struct device *dev, int family_id,
 	const char **family, const char **revision, const char **soc_id)
 {
+	int chip_info_base;
 	u32 chip_rev;
 	bool is_engineering_sample;
 	unsigned letter;
 	unsigned max_letters;
 	u32 model;
 	char model_letters[4];
+	const __be32 *offset;
+	struct regmap *regmap;
 	int err;
+
+	regmap = syscon_node_to_regmap(dev->of_node->parent);
+	if (IS_ERR(regmap)) {
+		dev_err(dev, "failed to get regmap\n");
+		return PTR_ERR(regmap);
+	}
+
+	offset = of_get_address(dev->of_node, 0, NULL, NULL);
+	chip_info_base = __be32_to_cpu(*offset);
 
 	switch (family_id) {
 	case REALTEK_SOC_COMPATIBLE_8380:
-		/* FIXME restore register value */
-		regmap_set_bits(regmap, rw_protect_base,
-			REALTEK_REG_PROTECT_READ | REALTEK_REG_PROTECT_WRITE);
 		max_letters = 3;
-		err = regmap_read(regmap,
-			chip_info_base + RTL8380_MODEL_NAME, &model);
-		if (err)
-			break;
-		err = regmap_read(regmap,
-			chip_info_base + RTL8380_MODEL_EXT_VERSION, &chip_rev);
-		/*
-		 * Correct the SoC-ID if the detection heuristics show we're
-		 * actually on an RTL8381M.
-		 */
-		if (!err && realtek_soc_id(model) == 0x8380 &&
-			rtl8380_is_rtl8381(regmap, mode_define_base))
-			model = (model & 0xffff) | (0x8381 << 16);
+		err = rtl8380_read_modelinfo(dev, regmap, chip_info_base,
+			&model, &chip_rev, &is_engineering_sample);
 		break;
 	case REALTEK_SOC_COMPATIBLE_8390:
 		max_letters = 2;
@@ -170,18 +208,9 @@ static int realtek_chipinfo_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
-	const __be32 *offset;
-	struct regmap *regmap;
-	int rw_protect_base, chip_info_base, mode_define_base;
 	struct soc_device_attribute *soc_dev_attr;
 	struct soc_device *soc_dev;
 	int match_family;
-
-	regmap = syscon_node_to_regmap(dev->of_node->parent);
-	if (IS_ERR(regmap)) {
-		dev_err(dev, "failed to get regmap\n");
-		return PTR_ERR(regmap);
-	}
 
 	soc_dev_attr = devm_kzalloc(dev, sizeof(*soc_dev_attr), GFP_KERNEL);
 	if (!soc_dev_attr)
@@ -196,30 +225,10 @@ static int realtek_chipinfo_probe(struct platform_device *pdev)
 	soc_dev_attr->data = match->data;
 	match_family = (int) match->data;
 
-	offset = of_get_address(dev->of_node, 0, NULL, NULL);
-	chip_info_base = __be32_to_cpu(*offset);
-
-	offset = of_get_address(dev->of_node, 1, NULL, NULL);
-	if (offset)
-		rw_protect_base = __be32_to_cpu(*offset);
-	else
-		dev_warn(dev, "INT_RW register base address found\n");
-
-	if (match_family == REALTEK_SOC_COMPATIBLE_8380) {
-		offset = of_get_address(dev->of_node, 2, NULL, NULL);
-		if (offset)
-			mode_define_base = __be32_to_cpu(*offset);
-		else
-			dev_warn(dev, "8380 family but no MODE_DEFINE_CTL "
-				"base address was defined\n");
-	}
-
 	of_property_read_string(NULL, "model", &soc_dev_attr->machine);
-	if(realtek_read_modelinfo(regmap, match_family,
-		rw_protect_base, chip_info_base, mode_define_base,
-		&soc_dev_attr->family, &soc_dev_attr->revision,
-		&soc_dev_attr->soc_id)) {
-		dev_err(dev, "unknown SoC compatible string\n");
+	if(realtek_read_modelinfo(dev, match_family, &soc_dev_attr->family,
+		&soc_dev_attr->revision, &soc_dev_attr->soc_id)) {
+		dev_err(dev, "failed to read model info\n");
 		return -EINVAL;
 	}
 
