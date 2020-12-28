@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <linux/leds.h>
-#include <linux/led-class-multicolor.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
@@ -237,110 +236,6 @@ port_led_simple_enable:
 	return 0;
 }
 
-struct realtek_port_multi_led {
-	struct led_classdev_mc mc_cdev;
-	struct regmap *map;
-	const struct led_port_modes *modes;
-	struct realtek_port_led_info *leds;
-};
-
-static void bicolor_led_brightness_set(struct led_classdev *cdev,
-	enum led_brightness brightness)
-{
-	struct led_classdev_mc *mc_cdev = lcdev_to_mccdev(cdev);
-	struct realtek_port_multi_led *ml = container_of(mc_cdev,
-		struct realtek_port_multi_led, mc_cdev);
-	unsigned l, mode;
-
-	led_mc_calc_color_components(mc_cdev, brightness);
-
-	for (l = 0; l < mc_cdev->num_colors; l++) {
-		mode = mc_cdev->subled_info[l].brightness ?
-			ml->modes->on : ml->modes->off;
-		realtek_port_led_set_mode(ml->map, &ml->leds[l], mode);
-	}
-}
-
-static int realtek_port_led_probe_multi(struct realtek_eio_port_led_ctrl *ctrl,
-	struct device_node *np, int max_sub_led)
-{
-	struct led_init_data init_data = {};
-	struct realtek_port_multi_led *mled;
-	struct led_classdev *led_cdev;
-	struct mc_subled *subled_info;
-	struct realtek_port_led_info *subled;
-	struct device_node *sub_np;
-	unsigned channel;
-	int subled_count;
-	int port, port_led;
-	int err;
-
-	if (of_property_read_bool(np, "realtek,hardware-managed")) {
-		dev_warn(ctrl->dev,
-			"hardware managed multi-led not supported\n");
-		return -ENODEV;
-	}
-
-	subled_count = of_get_child_count(np);
-	dev_info(ctrl->dev, "found %d sub led nodes\n", subled_count);
-
-	if (!subled_count) {
-		dev_warn(ctrl->dev, "no LEDs defined\n");
-		return -ENODEV;
-	}
-	else if (subled_count > max_sub_led) {
-		dev_warn(ctrl->dev, "too many LEDs defined\n");
-		return -EINVAL;
-	}
-
-	mled = devm_kzalloc(ctrl->dev, sizeof(*mled), GFP_KERNEL);
-	if (!mled)
-		return -ENOMEM;
-
-	subled = devm_kcalloc(ctrl->dev, subled_count,
-		sizeof(*subled), GFP_KERNEL);
-	subled_info = devm_kcalloc(ctrl->dev, subled_count,
-		sizeof(*subled_info), GFP_KERNEL);
-
-	if (!subled_info || !subled)
-		return -ENOMEM;
-
-	mled->map = ctrl->map;
-	mled->modes = ctrl->data->port_modes;
-	mled->leds = subled;
-	mled->mc_cdev.subled_info = subled_info;
-	mled->mc_cdev.num_colors = subled_count;
-
-	init_data.fwnode = of_fwnode_handle(np);
-
-	channel = 0;
-
-	for_each_child_of_node(np, sub_np) {
-		subled_info->channel = channel++;
-		of_property_read_u32(sub_np, "color",
-			&subled_info->color_index);
-
-		// TODO check port and port_led values
-		realtek_port_led_read_address(sub_np, &port, &port_led);
-		subled->reg = ctrl->data->port_mode_base + port;
-		subled->index = port_led;
-
-		subled_info++;
-		subled++;
-	}
-
-	led_cdev = &mled->mc_cdev.led_cdev;
-	led_cdev->max_brightness = 1;
-	led_cdev->brightness_set = bicolor_led_brightness_set;
-
-	err = devm_led_classdev_multicolor_register_ext(ctrl->dev,
-		&mled->mc_cdev, &init_data);
-
-	if (err)
-	    dev_err(ctrl->dev, "failed to register multi-led\n");
-	return err;
-}
-
 static void rtl8380_port_led_init(struct realtek_eio_port_led_ctrl *ctrl,
 	unsigned int led_count)
 {
@@ -471,15 +366,6 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 
 		if (of_node_name_prefix(child, "led")) {
 			err = realtek_port_led_probe_single(&ctrl, child);
-			if (err)
-				dev_warn(dev, "failed to register node\n");
-			continue;
-		}
-		else if (of_node_name_prefix(child, "multi-led")) {
-			dev_info(dev, "found multi-led node\n");
-
-			err = realtek_port_led_probe_multi(&ctrl, child,
-				leds_per_port);
 			if (err)
 				dev_warn(dev, "failed to register node\n");
 			continue;
