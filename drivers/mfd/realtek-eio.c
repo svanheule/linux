@@ -109,12 +109,12 @@ static int realtek_sys_led_blink_set(struct led_classdev *led_cdev,
 }
 
 static int realtek_sys_led_probe(struct realtek_eio_ctrl *ctrl,
-	struct device *parent, struct fwnode_handle *fwnode)
+	struct device *parent, struct device_node *np)
 {
 	struct led_classdev *sys_led = &ctrl->sys_led;
 	struct led_init_data init_data = {};
 
-	init_data.fwnode = fwnode;
+	init_data.fwnode = of_fwnode_handle(np);
 
 	sys_led->max_brightness = 1;
 	sys_led->brightness_set = realtek_sys_led_brightness_set;
@@ -195,7 +195,7 @@ static int realtek_eio_probe(struct platform_device *pdev)
 	/* Parse optional sys-led child */
 	np_sys_led = of_get_child_by_name(np, "sys-led");
 	if (IS_ERR(np_sys_led))
-		return PRT_ERR(np_sys_led);
+		return PTR_ERR(np_sys_led);
 
 	if (np_sys_led) {
 		err = realtek_sys_led_probe(ctrl, dev, np_sys_led);
