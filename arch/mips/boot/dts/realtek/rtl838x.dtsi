@@ -43,6 +43,8 @@
 
 	ext_io: ext-io@a000 {
 		compatible = "realtek,rtl8380-ext-io", "syscon";
+		#address-cells = <0>;
+		#size-cells = <0>;
 		reg = <0xa000 0xf4>;
 	};
 };

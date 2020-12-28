@@ -48,15 +48,16 @@
 };
 
 &ext_io {
-	port-led {
+	port-leds {
+		compatible = "realtek,rtl8380-eio-port-led";
 		/* Address is PORT.LED */
 		#address-cells = <2>;
 		#size-cells = <0>;
 
 		realtek,num-led = <2>;
-		realtek,hardware-match-condition = <
-			0 31  /* port  0-23: "link/act", "off" */
-			0 7>; /* port 24-27: "link/act", "link 1G" */
+		realtek,hardware-match-condition =
+			<0 31>, /* port  0-23: "link/act", "off" */
+			<0  7>; /* port 24-27: "link/act", "link 1G" */
 
 		CISCO_POE_PORT_LED(0)
 		CISCO_POE_PORT_LED(1)
@@ -95,6 +96,7 @@
 			reg = <27 1>;
 			color = <LED_COLOR_ID_AMBER>;
 			function = LED_FUNCTION_STATUS;
+			default-state = "off";
 		};
 //		multi-led-0 {
 //			#address-cells = <2>;
