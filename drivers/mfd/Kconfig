@@ -987,6 +987,7 @@ config MFD_RETU
 
 config MFD_REALTEK_EIO
 	tristate "Realtek external LED and GPIO driver"
+	select MFD_CORE
 	select MFD_SYSCON
 	depends on MACH_REALTEK
 	default MACH_REALTEK
