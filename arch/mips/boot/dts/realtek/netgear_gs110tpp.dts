@@ -6,6 +6,21 @@
 
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+#define NETGEAR_PORT_LED(phy) \
+	led@##phy##.0 { \
+		reg = <##phy 0>; \
+		realtek,hardware-managed; \
+		color = <LED_COLOR_ID_GREEN>; \
+		function = LED_FUNCTION_LAN; \
+	}; \
+	led@##phy##.1 { \
+		reg = <##phy 1>; \
+		realtek,hardware-managed; \
+		color = <LED_COLOR_ID_AMBER>; \
+		function = LED_FUNCTION_LAN; \
+	}
 
 / {
 	compatible = "netgear,gs110tpp-v1", "realtek,rtl83xx-soc";
@@ -40,6 +55,45 @@
 
 &uart0 {
 	status = "okay";
+};
+
+&switch_bus {
+	ext_io: ext-io@a000 {
+		compatible = "realtek,rtl8380-eio", "syscon";
+		#address-cells = <0>;
+		#size-cells = <0>;
+		reg = <0xa000 0xf4>;
+
+		port-leds {
+			compatible = "realtek,rtl8380-eio-port-led";
+			#address-cells = <2>;
+			#size-cells = <0>;
+
+			realtek,num-led = <2>;
+			realtek,hardware-match-condition =
+				<10 15>, /* Port  0-24: Link/Act 1G, 100M/10M */
+				<31 31>; /* Port 25-28: Off (unused) */
+
+			NETGEAR_PORT_LED(8);
+			NETGEAR_PORT_LED(9);
+			NETGEAR_PORT_LED(10);
+			NETGEAR_PORT_LED(11);
+			NETGEAR_PORT_LED(12);
+			NETGEAR_PORT_LED(13);
+			NETGEAR_PORT_LED(14);
+			NETGEAR_PORT_LED(15);
+			NETGEAR_PORT_LED(16);
+			NETGEAR_PORT_LED(17);
+		};
+
+		mdio {
+			compatible = "realtek,rtl8380-eio-mdio";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			clock-frequency = <10400000>;
+		};
+	};
 };
 
 &spiflash {
