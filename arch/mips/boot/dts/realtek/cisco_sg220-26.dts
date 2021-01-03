@@ -41,6 +41,15 @@
 		device_type = "memory";
 		reg = <0x0 0x8000000>;
 	};
+
+	gpio1: rtl8231@31 {
+		compatible = "realtek,rtl8231-mdio";
+		#gpio-cells = <2>;
+		gpio-controller;
+		ngpios = <37>;
+
+		dev-handle = <&expander31>;
+	};
 };
 
 &uart0 {
@@ -58,6 +67,12 @@
 			compatible = "realtek,rtl8380-eio-mdio";
 			#address-cells = <1>;
 			#size-cells = <0>;
+
+			clock-frequency = <20800000>;
+
+			expander31: gpio-expander@31 {
+				reg = <31>;
+			};
 		};
 
 		port-leds {
