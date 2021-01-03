@@ -23,6 +23,7 @@
 		realtek,hardware-managed; \
 	};
 
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/leds/common.h>
 
 #include "rtl83xx.dtsi"
@@ -49,6 +50,28 @@
 		ngpios = <37>;
 
 		dev-handle = <&expander31>;
+	};
+
+	i2c0: i2c {
+		compatible = "i2c-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		scl-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+		sda-gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>;
+
+		i2c-gpio,sda-open-drain;
+		i2c-gpio,scl-open-drain;
+
+		sensor@49 {
+			compatible = "national,lm75a";
+			reg = <0x49>;
+		};
+
+		sensor@4b {
+			compatible = "national,lm75a";
+			reg = <0x4b>;
+		};
 	};
 };
 
