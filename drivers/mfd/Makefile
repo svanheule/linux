@@ -269,4 +269,4 @@ obj-$(CONFIG_SGI_MFD_IOC3)	+= ioc3.o
 obj-$(CONFIG_MFD_SIMPLE_MFD_I2C)	+= simple-mfd-i2c.o
 obj-$(CONFIG_MFD_INTEL_M10_BMC)   += intel-m10-bmc.o
 
-obj-$(CONFIG_MFD_REALTEK_EIO)	+= realtek-eio.o realtek-eio-port-led.o
+obj-$(CONFIG_MFD_REALTEK_EIO)	+= realtek-eio.o realtek-eio-port-led.o realtek-eio-mdio.o

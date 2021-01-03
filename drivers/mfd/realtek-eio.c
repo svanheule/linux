@@ -23,7 +23,6 @@
 #define RTL8380_EIO_GPIO_DAT(pin)		(0xEC + 4*((pin)/32))
 
 struct realtek_eio_ctrl;
-struct realtek_gpio_mdio_data;
 
 struct realtek_eio_data {
 	unsigned int sys_led_pos;
@@ -150,9 +149,11 @@ static const struct of_device_id of_realtek_eio_match[] = {
 
 MODULE_DEVICE_TABLE(of, of_realtek_eio_match);
 
-static const struct mfd_cell mfd_port_led_devices[] = {
-	OF_MFD_CELL("realtek-eio-port-led",
+static const struct mfd_cell mfd_devices[] = {
+	OF_MFD_CELL("realtek-eio-port-leds",
 		NULL, NULL, 0, 0, "realtek,rtl8380-eio-port-led"),
+	OF_MFD_CELL("realtek-eio-mdio",
+		NULL, NULL, 0, 0, "realtek,rtl8380-eio-mdio"),
 };
 
 static int realtek_eio_probe(struct platform_device *pdev)
@@ -176,8 +177,6 @@ static int realtek_eio_probe(struct platform_device *pdev)
 		dev_err(dev, "no device match\n");
 		return -EINVAL;
 	}
-
-	platform_set_drvdata(pdev, ctrl);
 
 	ctrl->dev = dev;
 
@@ -204,11 +203,8 @@ static int realtek_eio_probe(struct platform_device *pdev)
 	}
 
 	/* Find sub-devices */
-	mfd_add_devices(dev, 0, mfd_port_led_devices,
-		ARRAY_SIZE(mfd_port_led_devices), NULL, 0, NULL);
-
-	/* Parse optional mdio-bus child */
-	// TODO
+	mfd_add_devices(dev, 0, mfd_devices,
+		ARRAY_SIZE(mfd_devices), NULL, 0, NULL);
 
 	/* Dump register values */
 	for (r = 0; r <= regmap_get_max_register(ctrl->map); r += 4) {
