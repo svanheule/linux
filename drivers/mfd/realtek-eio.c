@@ -143,9 +143,9 @@ static const struct realtek_eio_data rtl8380_eio_data = {
 
 static const struct of_device_id of_realtek_eio_match[] = {
 	{
-		.compatible = "realtek,rtl8380-ext-io",
-		.data = &rtl8380_eio_data
-	}
+		.compatible = "realtek,rtl8380-eio",
+		.data = &rtl8380_eio_data,
+	},
 };
 
 MODULE_DEVICE_TABLE(of, of_realtek_eio_match);

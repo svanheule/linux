@@ -47,75 +47,64 @@
 	status = "okay";
 };
 
-&ext_io {
-	port-leds {
-		compatible = "realtek,rtl8380-eio-port-led";
-		/* Address is PORT.LED */
-		#address-cells = <2>;
+&switch_bus {
+	ext_io: ext-io@a000 {
+		compatible = "realtek,rtl8380-eio", "syscon";
+		#address-cells = <0>;
 		#size-cells = <0>;
+		reg = <0xa000 0xf4>;
 
-		realtek,num-led = <2>;
-		realtek,hardware-match-condition =
-			<0 31>, /* port  0-23: "link/act", "off" */
-			<0  7>; /* port 24-27: "link/act", "link 1G" */
+		port-leds {
+			compatible = "realtek,rtl8380-eio-port-led";
+			/* Address is PORT.LED */
+			#address-cells = <2>;
+			#size-cells = <0>;
 
-		CISCO_POE_PORT_LED(0)
-		CISCO_POE_PORT_LED(1)
-		CISCO_POE_PORT_LED(2)
-		CISCO_POE_PORT_LED(3)
-		CISCO_POE_PORT_LED(4)
-		CISCO_POE_PORT_LED(5)
-		CISCO_POE_PORT_LED(6)
-		CISCO_POE_PORT_LED(7)
-		CISCO_POE_PORT_LED(8)
-		CISCO_POE_PORT_LED(9)
-		CISCO_POE_PORT_LED(10)
-		CISCO_POE_PORT_LED(11)
-		CISCO_POE_PORT_LED(12)
-		CISCO_POE_PORT_LED(13)
-		CISCO_POE_PORT_LED(14)
-		CISCO_POE_PORT_LED(15)
-		CISCO_POE_PORT_LED(16)
-		CISCO_POE_PORT_LED(17)
-		CISCO_POE_PORT_LED(18)
-		CISCO_POE_PORT_LED(19)
-		CISCO_POE_PORT_LED(20)
-		CISCO_POE_PORT_LED(21)
-		CISCO_POE_PORT_LED(22)
-		CISCO_POE_PORT_LED(23)
-		CISCO_PORT_LED(24)
-		CISCO_PORT_LED(25)
+			realtek,num-led = <2>;
+			realtek,hardware-match-condition =
+				<0 31>, /* port  0-23: "link/act", "off" */
+				<0  7>; /* port 24-27: "link/act", "link 1G" */
 
-		led@26.1 {
-			reg = <26 1>;
-			color = <LED_COLOR_ID_GREEN>;
-			function = LED_FUNCTION_STATUS;
-			linux,default-trigger = "default-on";
+			CISCO_POE_PORT_LED(0)
+			CISCO_POE_PORT_LED(1)
+			CISCO_POE_PORT_LED(2)
+			CISCO_POE_PORT_LED(3)
+			CISCO_POE_PORT_LED(4)
+			CISCO_POE_PORT_LED(5)
+			CISCO_POE_PORT_LED(6)
+			CISCO_POE_PORT_LED(7)
+			CISCO_POE_PORT_LED(8)
+			CISCO_POE_PORT_LED(9)
+			CISCO_POE_PORT_LED(10)
+			CISCO_POE_PORT_LED(11)
+			CISCO_POE_PORT_LED(12)
+			CISCO_POE_PORT_LED(13)
+			CISCO_POE_PORT_LED(14)
+			CISCO_POE_PORT_LED(15)
+			CISCO_POE_PORT_LED(16)
+			CISCO_POE_PORT_LED(17)
+			CISCO_POE_PORT_LED(18)
+			CISCO_POE_PORT_LED(19)
+			CISCO_POE_PORT_LED(20)
+			CISCO_POE_PORT_LED(21)
+			CISCO_POE_PORT_LED(22)
+			CISCO_POE_PORT_LED(23)
+			CISCO_PORT_LED(24)
+			CISCO_PORT_LED(25)
+
+			led@26.1 {
+				reg = <26 1>;
+				color = <LED_COLOR_ID_GREEN>;
+				function = LED_FUNCTION_STATUS;
+				linux,default-trigger = "default-on";
+			};
+			led@27.1 {
+				reg = <27 1>;
+				color = <LED_COLOR_ID_AMBER>;
+				function = LED_FUNCTION_STATUS;
+				default-state = "off";
+			};
 		};
-		led@27.1 {
-			reg = <27 1>;
-			color = <LED_COLOR_ID_AMBER>;
-			function = LED_FUNCTION_STATUS;
-			default-state = "off";
-		};
-//		multi-led-0 {
-//			#address-cells = <2>;
-//			#size-cells = <0>;
-//			reg = <0 0>;
-//
-//			color = <LED_COLOR_ID_MULTI>;
-//			function = LED_FUNCTION_STATUS;
-//			linux,default-trigger = "default-on";
-//
-//			led@26.1 {
-//				reg = <26 1>;
-//				color = <LED_COLOR_ID_GREEN>;
-//			};
-//			led@27.1 {
-//				reg = <27 1>;
-//				color = <LED_COLOR_ID_AMBER>;
-//			};
-//		};
 	};
 };
 
