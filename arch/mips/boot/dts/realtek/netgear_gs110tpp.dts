@@ -36,12 +36,39 @@
 		reg = <0x0 0x8000000>;
 	};
 
+	aliases {
+		led-boot = &led_sys_green;
+		led-failsafe = &led_sys_red;
+		led-running = &led_sys_blue;
+		led-upgrade = &led_sys_blue;
+	};
+
 	keys {
 		compatible = "gpio-keys";
 
 		reset {
 			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_sys_red: sys_red {
+			label = "red:system";
+			gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
+		};
+
+		led_sys_green: sys_green {
+			label = "green:system";
+			gpios = <&gpio1 32 GPIO_ACTIVE_LOW>;
+		};
+
+		led_sys_blue: sys_blue {
+			label = "blue:system";
+			gpios = <&gpio1 34 GPIO_ACTIVE_LOW>;
+			default-state = "on";
 		};
 	};
 
