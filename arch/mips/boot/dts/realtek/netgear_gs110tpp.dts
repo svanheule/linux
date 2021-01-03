@@ -51,6 +51,15 @@
 		priority = <192>;
 		open-source;
 	};
+
+	gpio1: rtl8231@31 {
+		compatible = "realtek,rtl8231-mdio";
+		#gpio-cells = <2>;
+		gpio-controller;
+		ngpios = <37>;
+
+		dev-handle = <&expander31>;
+	};
 };
 
 &uart0 {
@@ -92,6 +101,10 @@
 			#size-cells = <0>;
 
 			clock-frequency = <10400000>;
+
+			expander31: gpio-expander@31 {
+				reg = <31>;
+			};
 		};
 	};
 };
