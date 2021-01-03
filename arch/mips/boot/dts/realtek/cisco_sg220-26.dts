@@ -54,6 +54,12 @@
 		#size-cells = <0>;
 		reg = <0xa000 0xf4>;
 
+		mdio {
+			compatible = "realtek,rtl8380-eio-mdio";
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
 		port-leds {
 			compatible = "realtek,rtl8380-eio-port-led";
 			/* Address is PORT.LED */
