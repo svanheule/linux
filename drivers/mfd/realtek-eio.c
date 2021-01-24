@@ -154,6 +154,8 @@ static const struct mfd_cell mfd_devices[] = {
 		NULL, NULL, 0, 0, "realtek,rtl8380-eio-port-led"),
 	OF_MFD_CELL("realtek-eio-mdio",
 		NULL, NULL, 0, 0, "realtek,rtl8380-eio-mdio"),
+	OF_MFD_CELL("realtek-eio-pinctrl",
+		NULL, NULL, 0, 0, "realtek,rtl8380-eio-pinctrl"),
 };
 
 static int realtek_eio_probe(struct platform_device *pdev)
