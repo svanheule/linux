@@ -247,6 +247,8 @@ static int realtek_gpio_probe(struct platform_device *pdev)
 
 	ctrl->gc.ngpio = ngpios;
 	ctrl->gc.owner = THIS_MODULE;
+	ctrl->gc.request = gpiochip_generic_request;
+	ctrl->gc.free = gpiochip_generic_free;
 
 	girq = &ctrl->gc.irq;
 	girq->chip = &realtek_gpio_irq_chip;
