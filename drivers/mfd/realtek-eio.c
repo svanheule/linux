@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <linux/leds.h>
-#include <linux/mfd/syscon.h>
 #include <linux/mfd/core.h>
+#include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -170,7 +170,7 @@ static int realtek_eio_probe(struct platform_device *pdev)
 	if (!ctrl)
 		return -ENOMEM;
 
-	match = of_match_device(of_realtek_eio_match, &pdev->dev);
+	match = of_match_device(of_realtek_eio_match, dev);
 	if (match)
 		ctrl->data = (struct realtek_eio_data *) match->data;
 	else {
