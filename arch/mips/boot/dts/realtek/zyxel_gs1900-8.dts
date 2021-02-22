@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl83xx.dtsi"
+#include "rtl838x.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+#define ZYXEL_PORT_LED(phy) \
+	led@##phy##.0 { \
+		reg = <##phy 0>; \
+		realtek,hardware-managed; \
+	}
+
+/ {
+	compatible = "zyxel,gs1900-8", "realtek,rtl83xx-soc";
+	model = "ZyXEL GS1900-8";
+
+	chosen {
+		stdout-path = "serial0";
+		bootargs = "earlycon console=ttyS0,115200";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+
+	aliases {
+		led-boot = &led_sys;
+		led-failsafe = &led_sys;
+		led-running = &led_sys;
+		led-upgrade = &led_sys;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_sys: sys {
+			gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+			linux,default-trigger = "default-on";
+		};
+	};
+
+	gpio1: rtl8231 {
+		compatible = "realtek,rtl8231-mdio";
+		#gpio-cells = <2>;
+		gpio-controller;
+		ngpios = <37>;
+
+		dev-handle = <&expander0>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&gpio0 {
+	gpio-ranges = <&pinctrl0 0 0 1>, <&pinctrl0 2 2 2>;
+};
+
+&switch_bus {
+	ext_io: ext-io@a000 {
+		compatible = "realtek,rtl8380-eio", "syscon";
+		reg = <0xa000 0xf4>;
+
+//		led_sys: sys-led {
+//			color = <LED_COLOR_ID_GREEN>;
+//			function = LED_FUNCTION_STATUS;
+//			linux,default-trigger = "default-on";
+//		};
+
+		pinctrl0: pinctrl {
+			compatible = "realtek,rtl8380-eio-pinctrl";
+			#pinctrl-cells = <0>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&default_state>;
+
+			default_state: pinctrl0 {
+				/* Claim pins to prevent GPIO usage */
+			//	sys_led {
+			//		groups = "sys-led";
+			//		function = "sys-led";
+			//	};
+
+				ext_gpio_mii_bus {
+					groups = "ext-gpio-mii";
+					function = "ext-gpio-mii";
+				};
+			};
+		};
+
+		port-leds {
+			compatible = "realtek,rtl8380-eio-port-led";
+			#address-cells = <2>;
+			#size-cells = <0>;
+
+			realtek,num-led = <1>;
+			realtek,hardware-match-condition =
+				<0>, /* Port  0-24: Link/Act*/
+				<31>; /* Port 25-28: Off (unused) */
+
+			ZYXEL_PORT_LED(8);
+			ZYXEL_PORT_LED(9);
+			ZYXEL_PORT_LED(10);
+			ZYXEL_PORT_LED(11);
+			ZYXEL_PORT_LED(12);
+			ZYXEL_PORT_LED(13);
+			ZYXEL_PORT_LED(14);
+			ZYXEL_PORT_LED(15);
+		};
+
+		mdio {
+			compatible = "realtek,rtl8380-eio-mdio";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			clock-frequency = <2600000>;
+
+			expander0: gpio-expander@0 {
+				reg = <0>;
+			};
+		};
+	};
+};
