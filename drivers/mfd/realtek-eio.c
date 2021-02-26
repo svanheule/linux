@@ -26,6 +26,8 @@ struct realtek_eio_ctrl;
 
 struct realtek_eio_data {
 	unsigned int sys_led_pos;
+	const struct mfd_cell *mfd_devices;
+	unsigned int mfd_device_count;
 };
 
 struct realtek_eio_ctrl {
@@ -127,8 +129,19 @@ static int realtek_sys_led_probe(struct realtek_eio_ctrl *ctrl,
 	return devm_led_classdev_register_ext(parent, sys_led, &init_data);
 }
 
+static const struct mfd_cell rtl8380_mfd_devices[] = {
+	OF_MFD_CELL("realtek-eio-port-leds",
+		NULL, NULL, 0, 0, "realtek,rtl8380-eio-port-led"),
+	OF_MFD_CELL("realtek-eio-mdio",
+		NULL, NULL, 0, 0, "realtek,rtl8380-eio-mdio"),
+	OF_MFD_CELL("realtek-eio-pinctrl",
+		NULL, NULL, 0, 0, "realtek,rtl8380-eio-pinctrl"),
+};
+
 static const struct realtek_eio_data rtl8380_eio_data = {
 	.sys_led_pos = 16,
+	.mfd_devices = rtl8380_mfd_devices,
+	.mfd_device_count = ARRAY_SIZE(rtl8380_mfd_devices)
 };
 
 //static struct realtek_eio_data rtl8390_eio_data = {
@@ -151,15 +164,6 @@ static const struct of_device_id of_realtek_eio_match[] = {
 };
 
 MODULE_DEVICE_TABLE(of, of_realtek_eio_match);
-
-static const struct mfd_cell mfd_devices[] = {
-	OF_MFD_CELL("realtek-eio-port-leds",
-		NULL, NULL, 0, 0, "realtek,rtl8380-eio-port-led"),
-	OF_MFD_CELL("realtek-eio-mdio",
-		NULL, NULL, 0, 0, "realtek,rtl8380-eio-mdio"),
-	OF_MFD_CELL("realtek-eio-pinctrl",
-		NULL, NULL, 0, 0, "realtek,rtl8380-eio-pinctrl"),
-};
 
 static int realtek_eio_probe(struct platform_device *pdev)
 {
@@ -204,12 +208,12 @@ static int realtek_eio_probe(struct platform_device *pdev)
 	if (np_sys_led) {
 		err = realtek_sys_led_probe(ctrl, dev, np_sys_led);
 		if (err)
-		    return err;
+			return err;
 	}
 
 	/* Find sub-devices */
-	mfd_add_devices(dev, 0, mfd_devices,
-		ARRAY_SIZE(mfd_devices), NULL, 0, NULL);
+	mfd_add_devices(dev, 0, ctrl->data->mfd_devices,
+		ctrl->data->mfd_device_count, NULL, 0, NULL);
 
 	/* Dump register values */
 	for (r = 0; r <= regmap_get_max_register(ctrl->map); r += 4) {
