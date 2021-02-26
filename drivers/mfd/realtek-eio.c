@@ -144,10 +144,10 @@ static const struct realtek_eio_data rtl8380_eio_data = {
 	.mfd_device_count = ARRAY_SIZE(rtl8380_mfd_devices)
 };
 
-//static struct realtek_eio_data rtl8390_eio_data = {
-//	.sys_led_pos = 15,
-//};
-//
+static struct realtek_eio_data rtl8390_eio_data = {
+	.sys_led_pos = 15,
+};
+
 //static struct realtek_eio_data rtl9300_eio_data = {
 //	.sys_led_pos = 13,
 //};
@@ -160,6 +160,10 @@ static const struct of_device_id of_realtek_eio_match[] = {
 	{
 		.compatible = "realtek,rtl8380-eio",
 		.data = &rtl8380_eio_data,
+	},
+	{
+		.compatible = "realtek,rtl8390-eio",
+		.data = &rtl8390_eio_data,
 	},
 };
 
