@@ -26,7 +26,6 @@ struct realtek_eio_ctrl;
 
 struct realtek_eio_data {
 	unsigned int sys_led_pos;
-	unsigned int port_count;
 };
 
 struct realtek_eio_ctrl {
@@ -125,7 +124,6 @@ static int realtek_sys_led_probe(struct realtek_eio_ctrl *ctrl,
 
 static const struct realtek_eio_data rtl8380_eio_data = {
 	.sys_led_pos = 16,
-	.port_count = 28,
 };
 
 //static struct realtek_eio_data rtl8390_eio_data = {
