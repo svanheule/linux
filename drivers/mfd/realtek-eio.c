@@ -33,6 +33,7 @@ struct realtek_eio_ctrl {
 	struct regmap *map;
 	const struct realtek_eio_data *data;
 	struct led_classdev sys_led;
+	bool active_low;
 };
 
 /*
@@ -62,10 +63,11 @@ static void realtek_sys_led_brightness_set(struct led_classdev *led_cdev,
 	struct realtek_eio_ctrl *ctrl =
 		container_of(led_cdev, struct realtek_eio_ctrl, sys_led);
 
-	if (brightness)
-		realtek_sys_led_set(ctrl, REALTEK_SYS_LED_ON);
-	else
+	if ((!ctrl->active_low && brightness == LED_OFF) ||
+		(ctrl->active_low && brightness != LED_OFF))
 		realtek_sys_led_set(ctrl, REALTEK_SYS_LED_OFF);
+	else
+		realtek_sys_led_set(ctrl, REALTEK_SYS_LED_ON);
 }
 
 static enum led_brightness realtek_sys_led_brightness_get(
@@ -78,7 +80,8 @@ static enum led_brightness realtek_sys_led_brightness_get(
 	regmap_read(ctrl->map, REALTEK_EIO_GLOBAL_CTRL, &val);
 	val = (val >> ctrl->data->sys_led_pos) & 0x3;
 
-	if (val == REALTEK_SYS_LED_OFF)
+	if ((!ctrl->active_low && val == REALTEK_SYS_LED_OFF) ||
+		(ctrl->active_low && val == REALTEK_SYS_LED_ON))
 		return LED_OFF;
 	else
 		return LED_ON;
@@ -113,6 +116,8 @@ static int realtek_sys_led_probe(struct realtek_eio_ctrl *ctrl,
 	struct led_init_data init_data = {};
 
 	init_data.fwnode = of_fwnode_handle(np);
+
+	ctrl->active_low = of_property_read_bool(np, "active-low");
 
 	sys_led->max_brightness = 1;
 	sys_led->brightness_set = realtek_sys_led_brightness_set;
