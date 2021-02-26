@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl83xx.dtsi"
+#include "rtl838x.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+#define NETGEAR_PORT_LED(phy) \
+	led@##phy##.0 { \
+		reg = <##phy 0>; \
+		realtek,hardware-managed; \
+		color = <LED_COLOR_ID_GREEN>; \
+		function = LED_FUNCTION_LAN; \
+	}; \
+	led@##phy##.1 { \
+		reg = <##phy 1>; \
+		realtek,hardware-managed; \
+		color = <LED_COLOR_ID_AMBER>; \
+		function = LED_FUNCTION_LAN; \
+	}
+
+/ {
+	compatible = "netgear,gs110tpp-v1", "realtek,rtl83xx-soc";
+	model = "Netgear GS110TPP";
+
+	chosen {
+		stdout-path = "serial0";
+		bootargs = "earlycon console=ttyS0,115200";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+
+	aliases {
+		mdio-gpio1 = &mdio1;
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	leds {
+		pinctrl-names = "default";
+		pinctrl-0 = <&led_pin_config>;
+
+		compatible = "gpio-leds";
+
+		led_sys_red: sys_red {
+			gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_sys_green: sys_green {
+			gpios = <&gpio1 32 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_sys_blue: sys_blue {
+			gpios = <&gpio1 34 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			linux,default-trigger = "default-on";
+		};
+	};
+
+	gpio-restart {
+		compatible = "gpio-restart";
+		gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+		priority = <192>;
+		open-source;
+	};
+
+	mdio1: mdio {
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_mdx_pins>;
+
+		compatible = "virtual,mdio-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
+			<&gpio0 3 GPIO_ACTIVE_HIGH>;
+
+		gpio1: gpio-expander@31 {
+			compatible = "realtek,rtl8231";
+			reg = <31>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+			gpio-ranges = <&gpio1 0 0 37>;
+
+			led_pin_config: led-pins {
+				pins = "gpio31", "gpio32", "gpio34";
+				function = "gpio";
+			};
+		};
+	};
+
+	switchcore@1b000000 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x1b000000 0x20000>;
+
+		pinctrl_gpio: pinmux@a0e0 {
+			compatible = "pinctrl-single";
+			reg = <0xa0e0 0x4>;
+
+			pinctrl-single,bit-per-mux;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0x1>;
+			#pinctrl-cells = <2>;
+
+			gpio_mdx_pins: pinmux_gpio_mdx_pins {
+				pinctrl-single,bits = <0x0 0x0 0x1>;
+			};
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
