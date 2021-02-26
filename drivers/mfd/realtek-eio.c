@@ -212,8 +212,9 @@ static int realtek_eio_probe(struct platform_device *pdev)
 	}
 
 	/* Find sub-devices */
-	mfd_add_devices(dev, 0, ctrl->data->mfd_devices,
-		ctrl->data->mfd_device_count, NULL, 0, NULL);
+	if (ctrl->data->mfd_devices)
+		mfd_add_devices(dev, 0, ctrl->data->mfd_devices,
+			ctrl->data->mfd_device_count, NULL, 0, NULL);
 
 	/* Dump register values */
 	for (r = 0; r <= regmap_get_max_register(ctrl->map); r += 4) {
