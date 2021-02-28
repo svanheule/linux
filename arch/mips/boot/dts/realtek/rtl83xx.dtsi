@@ -79,5 +79,19 @@
 				<19 &cpuintc 4>, /* WFT IP1 */
 				<18 &cpuintc 5>; /* WDT IP2 */
 		};
+
+		gpio0: gpio@3500 {
+			compatible = "realtek,rtl8380-gpio", "realtek,otto-gpio";
+			reg = <0x3500 0x1c>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+			ngpios = <24>;
+
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			interrupt-parent = <&intc>;
+			interrupts = <23>;
+		};
 	};
 };
