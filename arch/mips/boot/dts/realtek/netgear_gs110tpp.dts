@@ -36,6 +36,10 @@
 		reg = <0x0 0x8000000>;
 	};
 
+	aliases {
+		mdio-gpio1 = &mdio1;
+	};
+
 	keys {
 		compatible = "gpio-keys";
 
@@ -45,11 +49,55 @@
 		};
 	};
 
+	leds {
+		compatible = "gpio-leds";
+
+		led_sys_red: sys_red {
+			gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_sys_green: sys_green {
+			gpios = <&gpio1 32 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_sys_blue: sys_blue {
+			gpios = <&gpio1 34 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			linux,default-trigger = "default-on";
+		};
+	};
+
 	gpio-restart {
 		compatible = "gpio-restart";
 		gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
 		priority = <192>;
 		open-source;
+	};
+
+	mdio1: mdio {
+		compatible = "virtual,mdio-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
+			<&gpio0 3 GPIO_ACTIVE_HIGH>;
+
+		expander31: gpio-expander@31 {
+			reg = <31>;
+		};
+	};
+
+	gpio1: rtl8231 {
+		compatible = "realtek,rtl8231-mdio";
+		#gpio-cells = <2>;
+		gpio-controller;
+		ngpios = <37>;
+
+		dev-handle = <&expander31>;
 	};
 };
 
