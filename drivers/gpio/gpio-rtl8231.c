@@ -2,7 +2,6 @@
 
 #include <linux/delay.h>
 #include <linux/gpio/driver.h>
-#include <linux/i2c.h>
 #include <linux/mdio.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -327,57 +326,6 @@ static struct mdio_driver rtl8231_mdio_driver = {
 	.probe = rtl8231_mdio_probe,
 };
 mdio_module_driver(rtl8231_mdio_driver);
-
-/* I2C support */
-static int rtl8231_i2c_probe(struct i2c_client *i2cdev)
-{
-	struct device *dev = &i2cdev->dev;
-	struct regmap_config regmap_cfg = {};
-	struct regmap *map;
-	u32 reg_width;
-	int err;
-
-	err = device_property_read_u32(dev, "realtek,regnum-width", &reg_width);
-	if (err) {
-		dev_err(dev, "invalid or missing realtek,regnum-width\n");
-		return err;
-	} else if (reg_width != 1 && reg_width != 2) {
-		dev_err(dev, "realtek,regnum-width must be 1 or 2\n");
-		return -EINVAL;
-	}
-
-	rtl8231_regmap_cfg_init(&regmap_cfg, 8*reg_width);
-	map = devm_regmap_init_i2c(i2cdev, &regmap_cfg);
-
-	if (IS_ERR(map)) {
-		dev_err(dev, "failed to init regmap\n");
-		return PTR_ERR(map);
-	}
-
-
-	return rtl8231_init(dev, map);
-}
-
-static const struct of_device_id rtl8231_i2c_of_match[] = {
-	{ .compatible = "realtek,rtl8231-i2c" },
-	{},
-};
-MODULE_DEVICE_TABLE(of, rtl8231_i2c_of_match);
-
-/* Upper three address bits are fixed */
-static const unsigned short normal_i2c[] = {
-	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, I2C_CLIENT_END};
-
-static struct i2c_driver rtl8231_i2c_driver = {
-	.driver = {
-		.name = "rtl8231-expander",
-		.of_match_table	= rtl8231_i2c_of_match,
-	},
-	.probe_new = rtl8231_i2c_probe,
-	.address_list = normal_i2c,
-	// TODO .detect ?
-};
-module_i2c_driver(rtl8231_i2c_driver);
 
 MODULE_AUTHOR("Sander Vanheule <sander@svanheule.net>");
 MODULE_DESCRIPTION("Realtek RTL8231 GPIO and LED expander support");

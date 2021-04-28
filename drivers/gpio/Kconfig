@@ -523,7 +523,6 @@ config GPIO_REG
 
 config GPIO_RTL8231
 	tristate "Realtek RTL8231 GPIO expander"
-	select REGMAP_I2C
 	select REGMAP_MDIO
 	select OF_MDIO
 	help
