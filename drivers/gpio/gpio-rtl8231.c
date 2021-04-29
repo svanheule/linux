@@ -1,37 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
-#include <linux/delay.h>
 #include <linux/gpio/driver.h>
-#include <linux/mdio.h>
+#include <linux/mfd/rtl8231.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
 #include <linux/regmap.h>
 
-/* RTL8231 registers for LED control */
-#define RTL8231_FUNC0			0x00
-#define RTL8231_FUNC1			0x01
-#define RTL8231_PIN_MODE0		0x02
-#define RTL8231_PIN_MODE1		0x03
-#define RTL8231_PIN_HI_CFG		0x04
-#define RTL8231_GPIO_DIR0		0x05
-#define RTL8231_GPIO_DIR1		0x06
-#define RTL8231_GPIO_INVERT0		0x07
-#define RTL8231_GPIO_INVERT1		0x08
-#define RTL8231_GPIO_DATA0		0x1c
-#define RTL8231_GPIO_DATA1		0x1d
-#define RTL8231_GPIO_DATA2		0x1e
+#define RTL8231_GPIO_DIR_IN	1
+#define RTL8231_GPIO_DIR_OUT	0
 
-#define RTL8231_READY_CODE_VALUE	0x37
-#define RTL8231_GPIO_DIR_IN		1
-#define RTL8231_GPIO_DIR_OUT		0
+#define RTL8231_MAX_GPIOS	37
 
-#define RTL8231_MAX_GPIOS		37
-
-enum rtl8231_regfield {
-	RTL8231_FIELD_LED_START,
-	RTL8231_FIELD_READY_CODE,
-	RTL8231_FIELD_SOFT_RESET,
+enum rtl8231_gpio_regfield {
 	RTL8231_FIELD_PIN_MODE0,
 	RTL8231_FIELD_PIN_MODE1,
 	RTL8231_FIELD_PIN_MODE2,
@@ -41,35 +22,24 @@ enum rtl8231_regfield {
 	RTL8231_FIELD_GPIO_DATA0,
 	RTL8231_FIELD_GPIO_DATA1,
 	RTL8231_FIELD_GPIO_DATA2,
-	RTL8231_FIELD_MAX
+	RTL8231_FIELD_GPIO_MAX
 };
 
-static const struct reg_field rtl8231_fields[RTL8231_FIELD_MAX] = {
-	[RTL8231_FIELD_LED_START]   = REG_FIELD(RTL8231_FUNC0, 1, 1),
-	[RTL8231_FIELD_READY_CODE]  = REG_FIELD(RTL8231_FUNC1, 4, 9),
-	[RTL8231_FIELD_SOFT_RESET]  = REG_FIELD(RTL8231_PIN_HI_CFG, 15, 15),
-	[RTL8231_FIELD_PIN_MODE0]   = REG_FIELD(RTL8231_PIN_MODE0, 0, 15),
-	[RTL8231_FIELD_PIN_MODE1]   = REG_FIELD(RTL8231_PIN_MODE1, 0, 15),
-	[RTL8231_FIELD_PIN_MODE2]   = REG_FIELD(RTL8231_PIN_HI_CFG, 0, 4),
-	[RTL8231_FIELD_GPIO_DIR0]   = REG_FIELD(RTL8231_GPIO_DIR0, 0, 15),
-	[RTL8231_FIELD_GPIO_DIR1]   = REG_FIELD(RTL8231_GPIO_DIR1, 0, 15),
-	[RTL8231_FIELD_GPIO_DIR2]   = REG_FIELD(RTL8231_PIN_HI_CFG, 5, 9),
-	[RTL8231_FIELD_GPIO_DATA0]  = REG_FIELD(RTL8231_GPIO_DATA0, 0, 15),
-	[RTL8231_FIELD_GPIO_DATA1]  = REG_FIELD(RTL8231_GPIO_DATA1, 0, 15),
-	[RTL8231_FIELD_GPIO_DATA2]  = REG_FIELD(RTL8231_GPIO_DATA2, 0, 4),
+static const struct reg_field rtl8231_fields[RTL8231_FIELD_GPIO_MAX] = {
+	[RTL8231_FIELD_PIN_MODE0] = REG_FIELD(RTL8231_REG_PIN_MODE0, 0, 15),
+	[RTL8231_FIELD_PIN_MODE1] = REG_FIELD(RTL8231_REG_PIN_MODE1, 0, 15),
+	[RTL8231_FIELD_PIN_MODE2] = REG_FIELD(RTL8231_REG_PIN_HI_CFG, 0, 4),
+	[RTL8231_FIELD_GPIO_DIR0] = REG_FIELD(RTL8231_REG_GPIO_DIR0, 0, 15),
+	[RTL8231_FIELD_GPIO_DIR1] = REG_FIELD(RTL8231_REG_GPIO_DIR1, 0, 15),
+	[RTL8231_FIELD_GPIO_DIR2] = REG_FIELD(RTL8231_REG_PIN_HI_CFG, 5, 9),
+	[RTL8231_FIELD_GPIO_DATA0] = REG_FIELD(RTL8231_REG_GPIO_DATA0, 0, 15),
+	[RTL8231_FIELD_GPIO_DATA1] = REG_FIELD(RTL8231_REG_GPIO_DATA1, 0, 15),
+	[RTL8231_FIELD_GPIO_DATA2] = REG_FIELD(RTL8231_REG_GPIO_DATA2, 0, 4),
 };
 
-/**
- * struct rtl8231_gpio_ctrl - Control data for an RTL8231 chip
- *
- * @gc: Associated gpio_chip instance
- * @dev
- * @fields
- */
 struct rtl8231_gpio_ctrl {
 	struct gpio_chip gc;
-	struct device *dev;
-	struct regmap_field *fields[RTL8231_FIELD_MAX];
+	struct regmap_field *fields[RTL8231_FIELD_GPIO_MAX];
 };
 
 static int rtl8231_pin_read(struct rtl8231_gpio_ctrl *ctrl, int base, int offset)
@@ -196,20 +166,41 @@ static void rtl8231_gpio_set_multiple(struct gpio_chip *gc,
 	}
 }
 
-static int rtl8231_probe_gpio(struct rtl8231_gpio_ctrl *ctrl)
+static int rtl8231_gpio_probe(struct platform_device *pdev)
 {
-	u32 ngpios = RTL8231_MAX_GPIOS;
+	struct device *dev = &pdev->dev;
+	struct rtl8231_gpio_ctrl *ctrl;
+	struct regmap *map;
+	int field;
 
-	device_property_read_u32(ctrl->dev, "ngpios", &ngpios);
-	if (ngpios > RTL8231_MAX_GPIOS) {
-		dev_err(ctrl->dev, "ngpios can be at most %d\n", RTL8231_MAX_GPIOS);
-		return -EINVAL;
+	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
+	if (!ctrl)
+		return -ENOMEM;
+
+	map = dev_get_regmap(dev->parent, NULL);
+
+	for (field = 0; field < RTL8231_FIELD_GPIO_MAX; field++) {
+		ctrl->fields[field] = devm_regmap_field_alloc(dev, map, rtl8231_fields[field]);
+		if (IS_ERR(ctrl->fields[field])) {
+			dev_err(dev, "unable to allocate regmap field\n");
+			return PTR_ERR(ctrl->fields[field]);
+		}
 	}
 
+	/* Select GPIO functionality for all pins and set to input */
+	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE0], 0xffff);
+	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR0], 0xffff);
+	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE1], 0xffff);
+	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR1], 0xffff);
+	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE2], 0x1f);
+	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR2], 0x1f);
+
 	ctrl->gc.base = -1;
-	ctrl->gc.ngpio = ngpios;
+	ctrl->gc.ngpio = RTL8231_MAX_GPIOS;
 	ctrl->gc.label = "rtl8231-gpio";
-	ctrl->gc.parent = ctrl->dev;
+	/* Either use parent device, or set gc.of_node explicitly */
+	ctrl->gc.parent = dev;
+	ctrl->gc.of_node = dev->parent->of_node;
 	ctrl->gc.owner = THIS_MODULE;
 	ctrl->gc.can_sleep = true;
 
@@ -221,112 +212,17 @@ static int rtl8231_probe_gpio(struct rtl8231_gpio_ctrl *ctrl)
 	ctrl->gc.direction_output = rtl8231_direction_output;
 	ctrl->gc.get_direction = rtl8231_get_direction;
 
-	return devm_gpiochip_add_data(ctrl->dev, &ctrl->gc, ctrl);
+	return devm_gpiochip_add_data(dev, &ctrl->gc, ctrl);
 }
 
-static int rtl8231_init(struct device *dev, struct regmap *map)
-{
-	struct rtl8231_gpio_ctrl *ctrl;
-	unsigned int v;
-	int field, err;
-
-	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
-	if (!ctrl)
-		return -ENOMEM;
-
-	ctrl->dev = dev;
-
-	for (field = 0; field < RTL8231_FIELD_MAX; field++) {
-		ctrl->fields[field] = devm_regmap_field_alloc(dev, map, rtl8231_fields[field]);
-		if (IS_ERR(ctrl->fields[field])) {
-			dev_err(dev, "unable to allocate regmap field\n");
-			return PTR_ERR(ctrl->fields[field]);
-		}
-	}
-
-	err = regmap_field_read(ctrl->fields[RTL8231_FIELD_READY_CODE], &v);
-	if (err) {
-		dev_err(dev, "failed to read READY_CODE\n");
-		return err;
-	} else if (v != RTL8231_READY_CODE_VALUE) {
-		dev_err(dev, "RTL8231 not present or ready 0x%x != 0x%x\n",
-			v, RTL8231_READY_CODE_VALUE);
-		return -ENODEV;
-	}
-
-	dev_info(dev, "RTL8231 found\n");
-
-	/* If the device was already configured, just leave it alone */
-	err = regmap_field_read(ctrl->fields[RTL8231_FIELD_LED_START], &v);
-	if (err)
-		return err;
-	else if (v) {
-		dev_info(dev, "already initialised\n");
-		return 0;
-	}
-
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_SOFT_RESET], 1);
-	mdelay(1);
-
-	/* Select GPIO functionality for all pins and set to input */
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE0], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR0], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE1], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR1], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE2], 0x1f);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR2], 0x1f);
-
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_LED_START], 1);
-
-	return rtl8231_probe_gpio(ctrl);
-}
-
-static void rtl8231_regmap_cfg_init(struct regmap_config *cfg, int reg_bits)
-{
-	cfg->val_bits = 16;
-	cfg->max_register = 0x1e;
-	cfg->cache_type = REGCACHE_NONE;
-	cfg->num_ranges = 0;
-	cfg->use_single_read = true;
-	cfg->use_single_write = true;
-	cfg->reg_format_endian = REGMAP_ENDIAN_BIG;
-	cfg->val_format_endian = REGMAP_ENDIAN_BIG;
-	cfg->reg_bits = reg_bits;
-}
-
-/* MDIO mode */
-static int rtl8231_mdio_probe(struct mdio_device *mdiodev)
-{
-	struct device *dev = &mdiodev->dev;
-	struct regmap *map;
-	struct regmap_config regmap_cfg = {};
-
-	rtl8231_regmap_cfg_init(&regmap_cfg, 5);
-	map = devm_regmap_init_mdio(mdiodev, &regmap_cfg);
-
-	if (IS_ERR(map)) {
-		dev_err(dev, "failed to init regmap\n");
-		return PTR_ERR(map);
-	}
-
-	return rtl8231_init(dev, map);
-}
-
-static const struct of_device_id rtl8231_mdio_of_match[] = {
-	{ .compatible = "realtek,rtl8231-mdio" },
-	{},
-};
-MODULE_DEVICE_TABLE(of, rtl8231_mdio_of_match);
-
-static struct mdio_driver rtl8231_mdio_driver = {
-	.mdiodrv.driver = {
-		.name = "rtl8231-expander",
-		.of_match_table	= rtl8231_mdio_of_match,
+static struct platform_driver rtl8231_gpio_driver = {
+	.driver = {
+		.name = "rtl8231-gpio",
 	},
-	.probe = rtl8231_mdio_probe,
+	.probe = rtl8231_gpio_probe,
 };
-mdio_module_driver(rtl8231_mdio_driver);
+module_platform_driver(rtl8231_gpio_driver);
 
 MODULE_AUTHOR("Sander Vanheule <sander@svanheule.net>");
-MODULE_DESCRIPTION("Realtek RTL8231 GPIO and LED expander support");
+MODULE_DESCRIPTION("Realtek RTL8231 GPIO support");
 MODULE_LICENSE("GPL v2");
