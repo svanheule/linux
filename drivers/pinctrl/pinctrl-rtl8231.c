@@ -187,13 +187,6 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 		}
 	}
 
-	/* Select GPIO functionality for all pins and set to input */
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE0], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR0], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE1], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR1], 0xffff);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_PIN_MODE2], 0x1f);
-	regmap_field_write(ctrl->fields[RTL8231_FIELD_GPIO_DIR2], 0x1f);
 
 	ctrl->gc.base = -1;
 	ctrl->gc.ngpio = RTL8231_MAX_GPIOS;
