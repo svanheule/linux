@@ -16,8 +16,8 @@ static const struct reg_field RTL8231_FIELD_READY_CODE = REG_FIELD(RTL8231_REG_F
 // TODO MFD cells for GPIO, pinctrl, LED driver
 static const struct mfd_cell rtl8231_cells[] = {
 	{
-		.name = "rtl8231-gpio",
-		.of_compatible = "realtek,rtl8231-gpio",
+		.name = "rtl8231-pinctrl",
+		.of_compatible = "realtek,rtl8231-pinctrl",
 	},
 	{
 		.name = "rtl8231-led",

@@ -166,7 +166,7 @@ static void rtl8231_gpio_set_multiple(struct gpio_chip *gc,
 	}
 }
 
-static int rtl8231_gpio_probe(struct platform_device *pdev)
+static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rtl8231_gpio_ctrl *ctrl;
@@ -215,14 +215,14 @@ static int rtl8231_gpio_probe(struct platform_device *pdev)
 	return devm_gpiochip_add_data(dev, &ctrl->gc, ctrl);
 }
 
-static struct platform_driver rtl8231_gpio_driver = {
+static struct platform_driver rtl8231_pinctrl_driver = {
 	.driver = {
-		.name = "rtl8231-gpio",
+		.name = "rtl8231-pinctrl",
 	},
-	.probe = rtl8231_gpio_probe,
+	.probe = rtl8231_pinctrl_probe,
 };
-module_platform_driver(rtl8231_gpio_driver);
+module_platform_driver(rtl8231_pinctrl_driver);
 
 MODULE_AUTHOR("Sander Vanheule <sander@svanheule.net>");
-MODULE_DESCRIPTION("Realtek RTL8231 GPIO support");
+MODULE_DESCRIPTION("Realtek RTL8231 pin control and GPIO support");
 MODULE_LICENSE("GPL v2");
