@@ -39,16 +39,13 @@ static int rtl8231_init(struct device *dev, struct regmap *map)
 
 	if (err) {
 		dev_err(dev, "failed to read READY_CODE\n");
+		goto out;
 	} else if (v != RTL8231_READY_CODE_VALUE) {
 		dev_err(dev, "RTL8231 not present or ready 0x%x != 0x%x\n",
 			v, RTL8231_READY_CODE_VALUE);
 		err = -ENODEV;
+		goto out;
 	}
-
-	regmap_field_free(field_ready_code);
-
-	if (err)
-		return err;
 
 	// TODO Implement reset-gpios?
 	// TODO soft reset?
@@ -64,9 +61,11 @@ static int rtl8231_init(struct device *dev, struct regmap *map)
 	regmap_write(map, RTL8231_REG_PIN_HI_CFG, GENMASK(4, 0) | GENMASK(9, 5));
 
 	/* LED_START enables power to output pins, and starts the LED engine */
-	regmap_update_bits(map, RTL8231_REG_FUNC0, BIT(1), BIT(1));
+	err = regmap_update_bits(map, RTL8231_REG_FUNC0, BIT(1), BIT(1));
 
-	return 0;
+out:
+	regmap_field_free(field_ready_code);
+	return err;
 }
 
 static int rtl8231_mdio_reg_read(void *ctx, unsigned int reg, unsigned int *val)
