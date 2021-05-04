@@ -68,7 +68,6 @@ static int rtl8231_pin_read(struct rtl8231_gpio_ctrl *ctrl, int base, int offset
 	int err;
 
 	err = regmap_field_read(ctrl->fields[field], &v);
-
 	if (err)
 		return err;
 
@@ -434,13 +433,20 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct rtl8231_gpio_ctrl *ctrl;
 	struct regmap *map;
-	int field;
+	int err, field;
 
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl)
 		return -ENOMEM;
 
 	map = dev_get_regmap(dev->parent, NULL);
+	if (IS_ERR_OR_NULL(map)) {
+		dev_err(dev, "failed to retreive regmap\n");
+		if (!map)
+			return -ENODEV;
+		else
+			return PTR_ERR(map);
+	}
 
 	for (field = 0; field < RTL8231_FIELD_GPIO_MAX; field++) {
 		ctrl->fields[field] = devm_regmap_field_alloc(dev, map, rtl8231_fields[field]);
@@ -455,13 +461,15 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 		return err;
 
 	ctrl->gc.base = -1;
-	ctrl->gc.ngpio = RTL8231_MAX_GPIOS;
-	ctrl->gc.label = "rtl8231-gpio";
-	/* Either use parent device, or set gc.of_node explicitly */
-	ctrl->gc.parent = dev;
-	ctrl->gc.of_node = dev->parent->of_node;
+	ctrl->gc.ngpio = RTL8231_NUM_GPIOS;
+	ctrl->gc.label = pdev->name;
 	ctrl->gc.owner = THIS_MODULE;
 	ctrl->gc.can_sleep = true;
+	/* Either use parent device, or set gc.of_node explicitly */
+	ctrl->gc.parent = dev;
+#if defined(CONFIG_OF_GPIO)
+	ctrl->gc.of_node = dev->parent->of_node;
+#endif
 
 	ctrl->gc.set = rtl8231_gpio_set;
 	ctrl->gc.set_multiple = rtl8231_gpio_set_multiple;
