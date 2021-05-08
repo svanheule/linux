@@ -8,20 +8,22 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 
+//static const struct reg_field RTL8231_FIELD_LED_START = REG_FIELD(RTL8231_REG_FUNC0, 1, 1);
 static const struct reg_field RTL8231_FIELD_READY_CODE = REG_FIELD(RTL8231_REG_FUNC1, 4, 9);
+//static const struct reg_field RTL8231_FIELD_SOFT_RESET = REG_FIELD(RTL8231_REG_PIN_HI_CFG, 15, 15);
 
 #define RTL8231_READY_CODE_VALUE	0x37
+#define RTL8231_RESET_MASK		BIT(15)
 #define RTL8231_LED_START_MASK		BIT(1)
 
-// TODO MFD cells for GPIO, pinctrl, LED driver
 static const struct mfd_cell rtl8231_cells[] = {
 	{
 		.name = "rtl8231-pinctrl",
 		.of_compatible = "realtek,rtl8231-pinctrl",
 	},
 	{
-		.name = "rtl8231-led",
-		.of_compatible = "realtek,rtl8231-led",
+		.name = "rtl8231-leds",
+		.of_compatible = "realtek,rtl8231-leds",
 	},
 };
 

@@ -8,8 +8,11 @@
 
 /* Chip control */
 #define RTL8231_REG_FUNC0		0x00
-#define RTL8231_REG_FUNC1		0x01
+#define RTL8231_FUNC0_SCAN_MODE		BIT(0)
+#define RTL8231_FUNC0_SCAN_SINGLE	0
+#define RTL8231_FUNC0_SCAN_BICOLOR	BIT(0)
 
+#define RTL8231_REG_FUNC1		0x01
 #define RTL8231_FUNC1_READY_CODE_VALUE	0x37
 
 /* Pin control */
@@ -35,6 +38,11 @@
 #define RTL8231_REG_GPIO_DATA0		0x1c
 #define RTL8231_REG_GPIO_DATA1		0x1d
 #define RTL8231_REG_GPIO_DATA2		0x1e
+
+/* LED control base registers */
+#define RTL8231_REG_LED0_BASE		0x09
+#define RTL8231_REG_LED1_BASE		0x10
+#define RTL8231_REG_LED2_BASE		0x17
 
 #define RTL8231_REG_COUNT		0x1f
 
