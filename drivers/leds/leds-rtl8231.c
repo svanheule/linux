@@ -197,8 +197,6 @@ static int rtl8231_led_probe_single(struct device *dev, struct regmap *map,
 		return -ENODEV;
 	}
 
-	dev_info(dev, "adding LED at %d.%d\n", port_index, led_index);
-
 	field = rtl8231_led_get_field(port_index, led_index);
 	pled->reg_field = devm_regmap_field_alloc(dev, map, field);
 	if (IS_ERR(pled->reg_field))
@@ -223,8 +221,6 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 	const unsigned int *port_count;
 	struct regmap *map;
 	int err;
-
-	dev_info(dev, "probing rtl8231-leds...\n");
 
 	map = dev_get_regmap(dev->parent, NULL);
 	if (IS_ERR_OR_NULL(map)) {
@@ -256,8 +252,6 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 	}
 
 	for_each_child_of_node(np, child) {
-		dev_info(dev, "probing %pOF\n", child);
-
 		if (of_node_name_prefix(child, "led")) {
 			err = rtl8231_led_probe_single(dev, map, port_count, child);
 			if (err)
