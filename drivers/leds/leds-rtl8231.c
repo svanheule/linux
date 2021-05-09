@@ -31,7 +31,8 @@ struct rtl8231_led {
 #define to_rtl8231_led(_cdev) container_of(_cdev, struct rtl8231_led, led)
 
 static const unsigned int RTL8231_NUM_LEDS = 3;
-static const unsigned int RTL8231_LED_PORT_COUNT[] = {32, 32, 24};
+static const unsigned int RTL8231_LED_PORT_COUNT_SINGLE[] = {32, 32, 24};
+static const unsigned int RTL8231_LED_PORT_COUNT_BICOLOR[] = {24, 24, 24};
 
 static const unsigned int RTL8231_LED_BASE[] = {
 	RTL8231_REG_LED0_BASE,
@@ -172,7 +173,8 @@ static struct reg_field rtl8231_led_get_field(unsigned int port_index, unsigned 
 	return field;
 }
 
-static int rtl8231_led_probe_single(struct device *dev, struct regmap *map, struct device_node *np)
+static int rtl8231_led_probe_single(struct device *dev, struct regmap *map,
+	const unsigned int *port_count, struct device_node *np)
 {
 	struct rtl8231_led *pled;
 	unsigned int port_index;
@@ -190,7 +192,7 @@ static int rtl8231_led_probe_single(struct device *dev, struct regmap *map, stru
 	if (err) {
 		dev_err(dev, "LED address invalid\n");
 		return err;
-	} else if (led_index >= RTL8231_NUM_LEDS || port_index >= RTL8231_LED_PORT_COUNT[led_index]) {
+	} else if (led_index >= RTL8231_NUM_LEDS || port_index >= port_count[led_index]) {
 		dev_err(dev, "LED address (%d.%d) invalid\n", port_index, led_index);
 		return -ENODEV;
 	}
@@ -218,6 +220,7 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *np, *child;
+	const unsigned int *port_count;
 	struct regmap *map;
 	int err;
 
@@ -239,11 +242,11 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 	}
 
 	if (!device_property_match_string(dev, "realtek,led-scan-mode", "single-color")) {
-		dev_info(dev, "singe color scan mode\n");
+		port_count = RTL8231_LED_PORT_COUNT_SINGLE;
 		regmap_update_bits(map, RTL8231_REG_FUNC0,
 			RTL8231_FUNC0_SCAN_MODE, RTL8231_FUNC0_SCAN_SINGLE);
 	} else if (!device_property_match_string(dev, "realtek,led-scan-mode", "bi-color")) {
-		dev_info(dev, "bi-color scan mode\n");
+		port_count = RTL8231_LED_PORT_COUNT_BICOLOR;
 		regmap_update_bits(map, RTL8231_REG_FUNC0,
 			RTL8231_FUNC0_SCAN_MODE, RTL8231_FUNC0_SCAN_BICOLOR);
 	}
@@ -256,7 +259,7 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 		dev_info(dev, "probing %pOF\n", child);
 
 		if (of_node_name_prefix(child, "led")) {
-			err = rtl8231_led_probe_single(dev, map, child);
+			err = rtl8231_led_probe_single(dev, map, port_count, child);
 			if (err)
 				dev_warn(dev, "failed to register %pOF\n", child);
 			continue;
