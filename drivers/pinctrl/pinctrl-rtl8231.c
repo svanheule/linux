@@ -196,14 +196,14 @@ static struct pinctrl_ops rtl8231_pinctrl_ops = {
 
 static int rtl8231_get_functions_count(struct pinctrl_dev *pctldev)
 {
-	struct rtl8231_gpio_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
+	struct rtl8231_pin_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
 
 	return ctrl->nfunctions;
 }
 
 static const char *rtl8231_get_function_name(struct pinctrl_dev *pctldev, unsigned int selector)
 {
-	struct rtl8231_gpio_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
+	struct rtl8231_pin_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
 
 	return ctrl->functions[selector].name;
 }
@@ -211,7 +211,7 @@ static const char *rtl8231_get_function_name(struct pinctrl_dev *pctldev, unsign
 static int rtl8231_get_function_groups(struct pinctrl_dev *pctldev, unsigned int selector,
 	const char * const **groups, unsigned *num_groups)
 {
-	struct rtl8231_gpio_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
+	struct rtl8231_pin_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
 
 	*groups = ctrl->functions[selector].groups;
 	*num_groups = ctrl->functions[selector].ngroups;
@@ -220,7 +220,7 @@ static int rtl8231_get_function_groups(struct pinctrl_dev *pctldev, unsigned int
 
 static int rtl8231_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector, unsigned int group_selector)
 {
-	struct rtl8231_gpio_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
+	struct rtl8231_pin_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
 	const struct rtl8231_pin_desc *desc = &rtl8231_pins[group_selector];
 	unsigned int func_flag = BIT(func_selector);
 	unsigned int function_mask;
@@ -264,7 +264,7 @@ static struct pinctrl_desc rtl8231_pctl_desc = {
 	.pmxops = &rtl8231_pinmux_ops,
 };
 
-static int rtl8231_pinctrl_init_functions(struct device *dev, struct rtl8231_gpio_ctrl *ctrl)
+static int rtl8231_pinctrl_init_functions(struct device *dev, struct rtl8231_pin_ctrl *ctrl)
 {
 	struct rtl8231_function *function;
 	const char **group_name;
@@ -301,7 +301,7 @@ static int rtl8231_pinctrl_init_functions(struct device *dev, struct rtl8231_gpi
 	return 0;
 }
 
-static int rtl8231_pinctrl_init(struct device *dev, struct rtl8231_gpio_ctrl *ctrl)
+static int rtl8231_pinctrl_init(struct device *dev, struct rtl8231_pin_ctrl *ctrl)
 {
 	struct pinctrl_dev *pctl;
 	struct pinctrl_pin_desc *pins;
@@ -346,14 +346,14 @@ static int rtl8231_pinctrl_init(struct device *dev, struct rtl8231_gpio_ctrl *ct
  */
 static int rtl8231_direction_input(struct gpio_chip *gc, unsigned int offset)
 {
-	struct rtl8231_gpio_ctrl *ctrl = gpiochip_get_data(gc);
+	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
 
 	return rtl8231_pin_write(ctrl, RTL8231_FIELD_GPIO_DIR0, offset, RTL8231_GPIO_DIR_IN);
 }
 
 static int rtl8231_direction_output(struct gpio_chip *gc, unsigned int offset, int value)
 {
-	struct rtl8231_gpio_ctrl *ctrl = gpiochip_get_data(gc);
+	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
 	int err;
 
 	err = rtl8231_pin_write(ctrl, RTL8231_FIELD_GPIO_DIR0, offset, RTL8231_GPIO_DIR_OUT);
@@ -365,21 +365,21 @@ static int rtl8231_direction_output(struct gpio_chip *gc, unsigned int offset, i
 
 static int rtl8231_get_direction(struct gpio_chip *gc, unsigned int offset)
 {
-	struct rtl8231_gpio_ctrl *ctrl = gpiochip_get_data(gc);
+	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
 
 	return rtl8231_pin_read(ctrl, RTL8231_FIELD_GPIO_DIR0, offset);
 }
 
 static int rtl8231_gpio_get(struct gpio_chip *gc, unsigned int offset)
 {
-	struct rtl8231_gpio_ctrl *ctrl = gpiochip_get_data(gc);
+	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
 
 	return rtl8231_pin_read(ctrl, RTL8231_FIELD_GPIO_DATA0, offset);
 }
 
 static void rtl8231_gpio_set(struct gpio_chip *gc, unsigned int offset, int value)
 {
-	struct rtl8231_gpio_ctrl *ctrl = gpiochip_get_data(gc);
+	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
 
 	rtl8231_pin_write(ctrl, RTL8231_FIELD_GPIO_DATA0, offset, value);
 }
@@ -387,7 +387,7 @@ static void rtl8231_gpio_set(struct gpio_chip *gc, unsigned int offset, int valu
 static int rtl8231_gpio_get_multiple(struct gpio_chip *gc,
 	unsigned long *mask, unsigned long *bits)
 {
-	struct rtl8231_gpio_ctrl *ctrl = gpiochip_get_data(gc);
+	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
 	int read, field;
 	int offset, shift;
 	int sub_mask;
@@ -421,7 +421,7 @@ static int rtl8231_gpio_get_multiple(struct gpio_chip *gc,
 static void rtl8231_gpio_set_multiple(struct gpio_chip *gc,
 	unsigned long *mask, unsigned long *bits)
 {
-	struct rtl8231_gpio_ctrl *ctrl = gpiochip_get_data(gc);
+	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
 	int read, field;
 	int offset, shift;
 	int sub_mask;
@@ -448,7 +448,7 @@ static void rtl8231_gpio_set_multiple(struct gpio_chip *gc,
 static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct rtl8231_gpio_ctrl *ctrl;
+	struct rtl8231_pin_ctrl *ctrl;
 	int err, field;
 
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
