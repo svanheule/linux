@@ -144,15 +144,15 @@ static int rtl8231_led_read_address(struct device_node *np, unsigned int *addr_p
 {
 	const __be32 *addr;
 
+	if (of_n_addr_cells(np) != 2 || of_n_size_cells(np) != 0)
+		return -ENODEV;
+
 	addr = of_get_address(np, 0, NULL, NULL);
 	if (!addr)
 		return -ENODEV;
-	*addr_port = of_read_number(addr, 1);
 
-	addr = of_get_address(np, 1, NULL, NULL);
-	if (!addr)
-		return -ENODEV;
-	*addr_led = of_read_number(addr, 1);
+	*addr_port = of_read_number(addr, 1);
+	*addr_led = of_read_number(addr+1, 1);
 
 	return 0;
 }
@@ -232,6 +232,12 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 			return PTR_ERR(map);
 	}
 
+	np = of_find_compatible_node(dev->parent->of_node, NULL, "realtek,rtl8231-leds");
+	if (IS_ERR(np)) {
+		dev_err(dev, "failed to find OF node\n");
+		return -ENODEV;
+	}
+
 	if (!device_property_match_string(dev, "realtek,led-scan-mode", "single-color")) {
 		dev_info(dev, "singe color scan mode\n");
 		regmap_update_bits(map, RTL8231_REG_FUNC0,
@@ -245,8 +251,6 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 		dev_err(dev, "scan mode missing or invalid\n");
 		return -EINVAL;
 	}
-
-	dev_info(dev, "main node %pOF\n", np);
 
 	for_each_child_of_node(np, child) {
 		dev_info(dev, "probing %pOF\n", child);
