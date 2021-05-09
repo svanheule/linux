@@ -50,35 +50,10 @@
 		};
 	};
 
-	mdio1: mdio {
-		compatible = "virtual,mdio-gpio";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
-			<&gpio0 3 GPIO_ACTIVE_HIGH>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&gpio_mdx_pins>;
-
-		expander0: gpio-expander@0 {
-			compatible = "realtek,rtl8231-mdio";
-			reg = <0>;
-		};
-	};
-
-	gpio1: rtl8231 {
-		compatible = "realtek,rtl8231-mdio";
-		#gpio-cells = <2>;
-		gpio-controller;
-		ngpios = <37>;
-
-		dev-handle = <&expander0>;
-	};
-
 	keys {
 		compatible = "gpio-keys-polled";
 		poll-interval = <10>;
-		debounce-interval = <60>;
+		debounce-interval = <50>;
 
 		reset {
 			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
@@ -91,6 +66,53 @@
 		gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
 		priority = <192>;
 		open-source;
+	};
+
+	mdio1: mdio {
+		compatible = "virtual,mdio-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
+			<&gpio0 3 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_mdx_pins>;
+
+		reset-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+		reset-delay-us = <1000>;
+		reset-post-delay-us = <10000>;
+
+		gpio1: expander@0 {
+			compatible = "realtek,rtl8231", "syscon";
+			reg = <0x0>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&pin_settings>;
+
+			pin_settings: pinconfig {
+				gpio_pins {
+					pins = "gpio3", "gpio5";
+					function = "gpio";
+				};
+			};
+
+			leds {
+				compatible = "realtek,rtl8231-leds";
+				#address-cells = <2>;
+				#size-cells = <0>;
+
+				realtek,led-scan-mode = "single-color";
+
+				led@0.0 {
+					reg = <0 0>;
+					color = <LED_COLOR_ID_BLUE>;
+					function = LED_FUNCTION_ACTIVITY;
+				};
+			};
+		};
 	};
 
 	switchcore@1b000000 {
