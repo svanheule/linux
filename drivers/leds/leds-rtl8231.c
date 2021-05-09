@@ -10,7 +10,7 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 
-struct led_blink_rate {
+struct led_toggle_rate {
 	u16 interval; /* Toggle interval in ms */
 	u8 mode; /* Register value */
 };
@@ -18,9 +18,9 @@ struct led_blink_rate {
 struct led_modes {
 	unsigned int off;
 	unsigned int on;
-	/* Array of blink rates, sorted by blink interval */ 
-	const struct led_blink_rate *blink_rates;
-	unsigned int num_blink_rates;
+	/* Array of toggle rates, sorted by interval */
+	const struct led_toggle_rate *toggle_rates;
+	unsigned int num_toggle_rates;
 };
 
 struct rtl8231_led {
@@ -41,7 +41,7 @@ static const unsigned int RTL8231_LED_BASE[] = {
 static const unsigned int RTL8231_LED_PER_REG = 5;
 static const unsigned int RTL8231_BITS_PER_LED = 3;
 
-static const struct led_blink_rate rtl8231_blink_rates[] = {
+static const struct led_toggle_rate rtl8231_toggle_rates[] = {
 	{  40, 1},
 	{  80, 2},
 	{ 160, 3},
@@ -53,8 +53,8 @@ static const struct led_blink_rate rtl8231_blink_rates[] = {
 static const struct led_modes rtl8231_led_modes = {
 	.off = 0,
 	.on = 7,
-	.num_blink_rates = ARRAY_SIZE(rtl8231_blink_rates),
-	.blink_rates = rtl8231_blink_rates
+	.num_toggle_rates = ARRAY_SIZE(rtl8231_toggle_rates),
+	.toggle_rates = rtl8231_toggle_rates
 };
 
 static void rtl8231_led_brightness_set(struct led_classdev *led_cdev, enum led_brightness brightness)
@@ -88,11 +88,11 @@ static unsigned int rtl8231_led_current_interval(struct rtl8231_led *pled)
 	if (regmap_field_read(pled->reg_field, &mode))
 		return 0;
 
-	while (i < pled->modes->num_blink_rates && mode != pled->modes->blink_rates[i].mode)
+	while (i < pled->modes->num_toggle_rates && mode != pled->modes->toggle_rates[i].mode)
 		i++;
 
-	if (i < pled->modes->num_blink_rates)
-		return pled->modes->blink_rates[i].interval;
+	if (i < pled->modes->num_toggle_rates)
+		return pled->modes->toggle_rates[i].interval;
 	else
 		return 0;
 }
@@ -124,13 +124,13 @@ static int rtl8231_led_blink_set(struct led_classdev *led_cdev, unsigned long *d
 			interval = (*delay_on + *delay_off) / 2;
 	}
 
-	/* Find clamped blink interval */
-	while (i < (modes->num_blink_rates - 1) && interval > modes->blink_rates[i].interval)
+	/* Find clamped toggle interval */
+	while (i < (modes->num_toggle_rates - 1) && interval > modes->toggle_rates[i].interval)
 		i++;
 
-	interval = modes->blink_rates[i].interval;
+	interval = modes->toggle_rates[i].interval;
 
-	err = regmap_field_write(pled->reg_field, modes->blink_rates[i].mode);
+	err = regmap_field_write(pled->reg_field, modes->toggle_rates[i].mode);
 	if (err)
 		return err;
 
