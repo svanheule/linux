@@ -440,7 +440,7 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rtl8231_pin_ctrl *ctrl;
-	int err, field;
+	int err;
 
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl)
@@ -455,12 +455,11 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 			return PTR_ERR(ctrl->map);
 	}
 
-	for (field = 0; field < RTL8231_FIELD_GPIO_MAX; field++) {
-		ctrl->fields[field] = devm_regmap_field_alloc(dev, map, rtl8231_fields[field]);
-		if (IS_ERR(ctrl->fields[field])) {
-			dev_err(dev, "unable to allocate regmap field\n");
-			return PTR_ERR(ctrl->fields[field]);
-		}
+	err = devm_regmap_field_bulk_alloc(dev, ctrl->map, ctrl->fields, rtl8231_fields,
+		ARRAY_SIZE(ctrl->fields));
+	if (err) {
+		dev_err(dev, "unable to allocate gpio regmap fields\n");
+		return err;
 	}
 
 	err = rtl8231_pinctrl_init(dev, ctrl);
