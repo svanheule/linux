@@ -52,8 +52,9 @@ struct rtl8231_function {
 	const char **groups;
 };
 
-struct rtl8231_gpio_ctrl {
+struct rtl8231_pin_ctrl {
 	struct gpio_chip gc;
+	struct regmap *map;
 	struct regmap_field *fields[RTL8231_FIELD_GPIO_MAX];
 	/* Pin controller info */
 	unsigned int nfunctions;
@@ -101,49 +102,66 @@ struct rtl8231_pin_desc {
 	unsigned int number;
 	const char *name;
 	enum rtl8231_pin_function functions;
+	u8 reg;
+	u8 offset;
+	u8 gpio_function_value;
 };
 
-#define RTL8231_PIN(_n, _f)	{.number = (_n), .name = ("gpio" #_n), .functions = (_f)}
+#define RTL8231_PIN(_num, _func, _reg, _fld, _val)		\
+	{							\
+		.number = _num,					\
+		.name = "gpio" #_num,				\
+		.functions = RTL8231_PIN_FUNCTION_GPIO | _func,	\
+		.reg = _reg,					\
+		.offset = _fld,					\
+		.gpio_function_value = _val,			\
+	}
+#define RTL8231_GPIO_PIN(_num)					\
+	RTL8231_PIN(_num, 0, 0, 0, 0)
+#define RTL8231_LED_PIN(_num, _reg, _fld)			\
+	RTL8231_PIN(_num, RTL8231_PIN_FUNCTION_LED, _reg, _fld, RTL8231_MODE_GPIO)
+#define RTL8231_PWM_PIN(_num, _reg, _fld)			\
+	RTL8231_PIN(_num, RTL8231_PIN_FUNCTION_PWM, _reg, _fld, 0)
 
-/* Pins always support GPIO, and may support an alternate function */
-static const struct rtl8231_pin_desc rtl8231_pins[] = {
-	RTL8231_PIN(0, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(1, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(2, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(3, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(4, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(5, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(6, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(7, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(8, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(9, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(10, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(11, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(12, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(13, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(14, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(15, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(16, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(17, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(18, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(19, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(20, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(21, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(22, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(23, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(24, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(25, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(26, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(27, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(28, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(29, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(30, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(31, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(32, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(33, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(34, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_LED),
-	RTL8231_PIN(35, RTL8231_PIN_FUNCTION_GPIO | RTL8231_PIN_FUNCTION_PWM),
-	RTL8231_PIN(36, RTL8231_PIN_FUNCTION_GPIO),
+/* Pins always support GPIO, and may support one alternate function */
+static const struct rtl8231_pin_desc rtl8231_pins[RTL8231_NUM_GPIOS] = {
+	RTL8231_LED_PIN( 0, RTL8231_REG_PIN_MODE0,  0),
+	RTL8231_LED_PIN( 1, RTL8231_REG_PIN_MODE0,  1),
+	RTL8231_LED_PIN( 2, RTL8231_REG_PIN_MODE0,  2),
+	RTL8231_LED_PIN( 3, RTL8231_REG_PIN_MODE0,  3),
+	RTL8231_LED_PIN( 4, RTL8231_REG_PIN_MODE0,  4),
+	RTL8231_LED_PIN( 5, RTL8231_REG_PIN_MODE0,  5),
+	RTL8231_LED_PIN( 6, RTL8231_REG_PIN_MODE0,  6),
+	RTL8231_LED_PIN( 7, RTL8231_REG_PIN_MODE0,  7),
+	RTL8231_LED_PIN( 8, RTL8231_REG_PIN_MODE0,  8),
+	RTL8231_LED_PIN( 9, RTL8231_REG_PIN_MODE0,  9),
+	RTL8231_LED_PIN(10, RTL8231_REG_PIN_MODE0, 10),
+	RTL8231_LED_PIN(11, RTL8231_REG_PIN_MODE0, 11),
+	RTL8231_LED_PIN(12, RTL8231_REG_PIN_MODE0, 12),
+	RTL8231_LED_PIN(13, RTL8231_REG_PIN_MODE0, 13),
+	RTL8231_LED_PIN(14, RTL8231_REG_PIN_MODE0, 14),
+	RTL8231_LED_PIN(15, RTL8231_REG_PIN_MODE0, 15),
+	RTL8231_LED_PIN(16, RTL8231_REG_PIN_MODE1,  0),
+	RTL8231_LED_PIN(17, RTL8231_REG_PIN_MODE1,  1),
+	RTL8231_LED_PIN(18, RTL8231_REG_PIN_MODE1,  2),
+	RTL8231_LED_PIN(19, RTL8231_REG_PIN_MODE1,  3),
+	RTL8231_LED_PIN(20, RTL8231_REG_PIN_MODE1,  4),
+	RTL8231_LED_PIN(21, RTL8231_REG_PIN_MODE1,  5),
+	RTL8231_LED_PIN(22, RTL8231_REG_PIN_MODE1,  6),
+	RTL8231_LED_PIN(23, RTL8231_REG_PIN_MODE1,  7),
+	RTL8231_LED_PIN(24, RTL8231_REG_PIN_MODE1,  8),
+	RTL8231_LED_PIN(25, RTL8231_REG_PIN_MODE1,  9),
+	RTL8231_LED_PIN(26, RTL8231_REG_PIN_MODE1, 10),
+	RTL8231_LED_PIN(27, RTL8231_REG_PIN_MODE1, 11),
+	RTL8231_LED_PIN(28, RTL8231_REG_PIN_MODE1, 12),
+	RTL8231_LED_PIN(29, RTL8231_REG_PIN_MODE1, 13),
+	RTL8231_LED_PIN(30, RTL8231_REG_PIN_MODE1, 14),
+	RTL8231_LED_PIN(31, RTL8231_REG_PIN_MODE1, 15),
+	RTL8231_LED_PIN(32, RTL8231_REG_PIN_HI_CFG, 0),
+	RTL8231_LED_PIN(33, RTL8231_REG_PIN_HI_CFG, 1),
+	RTL8231_LED_PIN(34, RTL8231_REG_PIN_HI_CFG, 2),
+	RTL8231_PWM_PIN(35, RTL8231_REG_FUNC1, 3),
+	RTL8231_GPIO_PIN(36),
 };
 
 static int rtl8231_get_groups_count(struct pinctrl_dev *pctldev)
@@ -203,26 +221,25 @@ static int rtl8231_get_function_groups(struct pinctrl_dev *pctldev, unsigned int
 static int rtl8231_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector, unsigned int group_selector)
 {
 	struct rtl8231_gpio_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
+	const struct rtl8231_pin_desc *desc = &rtl8231_pins[group_selector];
 	unsigned int func_flag = BIT(func_selector);
-	/* Group selector should match the pin */
-	unsigned int pin = group_selector;
+	unsigned int function_mask;
+	unsigned int gpio_function;
 	int err = 0;
 
-	if (!(rtl8231_pins[pin].functions & func_flag))
+	if (!(desc->functions & func_flag))
 		return -EINVAL;
 
+	function_mask = BIT(desc->offset);
+	gpio_function = desc->gpio_function_value << desc->offset;
+
 	switch (func_flag) {
-	case RTL8231_PIN_FUNCTION_GPIO:
-		err = rtl8231_pin_write(ctrl, RTL8231_FIELD_PIN_MODE0, pin, RTL8231_MODE_GPIO);
-		// FIXME This feels like terrible hack
-		if (!err && (rtl8231_pins[pin].functions & RTL8231_PIN_FUNCTION_PWM))
-			err = rtl8231_pin_write(ctrl, RTL8231_FIELD_BUZZER, 0, 0);
-		break;
 	case RTL8231_PIN_FUNCTION_LED:
-		err = rtl8231_pin_write(ctrl, RTL8231_FIELD_PIN_MODE0, pin, RTL8231_MODE_LED);
-		break;
 	case RTL8231_PIN_FUNCTION_PWM:
-		err = rtl8231_pin_write(ctrl, RTL8231_FIELD_BUZZER, 0, 1);
+		err = regmap_update_bits(ctrl->map, desc->reg, function_mask, ~gpio_function);
+		break;
+	case RTL8231_PIN_FUNCTION_GPIO:
+		err = regmap_update_bits(ctrl->map, desc->reg, function_mask, gpio_function);
 		break;
 	default:
 		return -EINVAL;
@@ -432,20 +449,19 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rtl8231_gpio_ctrl *ctrl;
-	struct regmap *map;
 	int err, field;
 
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl)
 		return -ENOMEM;
 
-	map = dev_get_regmap(dev->parent, NULL);
-	if (IS_ERR_OR_NULL(map)) {
+	ctrl->map = dev_get_regmap(dev->parent, NULL);
+	if (IS_ERR_OR_NULL(ctrl->map)) {
 		dev_err(dev, "failed to retreive regmap\n");
-		if (!map)
+		if (!ctrl->map)
 			return -ENODEV;
 		else
-			return PTR_ERR(map);
+			return PTR_ERR(ctrl->map);
 	}
 
 	for (field = 0; field < RTL8231_FIELD_GPIO_MAX; field++) {
