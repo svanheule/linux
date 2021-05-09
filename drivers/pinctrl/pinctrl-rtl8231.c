@@ -17,33 +17,24 @@
 #define RTL8231_MODE_GPIO	1
 
 #define RTL8231_NUM_GPIOS	37
-#define RTL8231_MAX_LED_PIN	35
 
 enum rtl8231_regfield {
-	RTL8231_FIELD_PIN_MODE0,
-	RTL8231_FIELD_PIN_MODE1,
-	RTL8231_FIELD_PIN_MODE2,
 	RTL8231_FIELD_GPIO_DIR0,
 	RTL8231_FIELD_GPIO_DIR1,
 	RTL8231_FIELD_GPIO_DIR2,
 	RTL8231_FIELD_GPIO_DATA0,
 	RTL8231_FIELD_GPIO_DATA1,
 	RTL8231_FIELD_GPIO_DATA2,
-	RTL8231_FIELD_BUZZER,
 	RTL8231_FIELD_GPIO_MAX
 };
 
-static const struct reg_field rtl8231_fields[RTL8231_FIELD_GPIO_MAX] = {
-	[RTL8231_FIELD_PIN_MODE0] = REG_FIELD(RTL8231_REG_PIN_MODE0, 0, 15),
-	[RTL8231_FIELD_PIN_MODE1] = REG_FIELD(RTL8231_REG_PIN_MODE1, 0, 15),
-	[RTL8231_FIELD_PIN_MODE2] = REG_FIELD(RTL8231_REG_PIN_HI_CFG, 0, 4),
+static struct reg_field rtl8231_fields[RTL8231_FIELD_GPIO_MAX] = {
 	[RTL8231_FIELD_GPIO_DIR0] = REG_FIELD(RTL8231_REG_GPIO_DIR0, 0, 15),
 	[RTL8231_FIELD_GPIO_DIR1] = REG_FIELD(RTL8231_REG_GPIO_DIR1, 0, 15),
 	[RTL8231_FIELD_GPIO_DIR2] = REG_FIELD(RTL8231_REG_PIN_HI_CFG, 5, 9),
 	[RTL8231_FIELD_GPIO_DATA0] = REG_FIELD(RTL8231_REG_GPIO_DATA0, 0, 15),
 	[RTL8231_FIELD_GPIO_DATA1] = REG_FIELD(RTL8231_REG_GPIO_DATA1, 0, 15),
 	[RTL8231_FIELD_GPIO_DATA2] = REG_FIELD(RTL8231_REG_GPIO_DATA2, 0, 4),
-	[RTL8231_FIELD_BUZZER] = REG_FIELD(RTL8231_REG_FUNC1, 3, 3),
 };
 
 struct rtl8231_function {
@@ -60,28 +51,6 @@ struct rtl8231_pin_ctrl {
 	unsigned int nfunctions;
 	struct rtl8231_function *functions;
 };
-
-static int rtl8231_pin_read(struct rtl8231_gpio_ctrl *ctrl, int base, int offset)
-{
-	int field = base + offset / 16;
-	int bit = offset % 16;
-	unsigned int v;
-	int err;
-
-	err = regmap_field_read(ctrl->fields[field], &v);
-	if (err)
-		return err;
-
-	return !!(v & BIT(bit));
-}
-
-static int rtl8231_pin_write(struct rtl8231_gpio_ctrl *ctrl, int base, int offset, int val)
-{
-	int field = base + offset / 16;
-	int bit = offset % 16;
-
-	return regmap_field_update_bits(ctrl->fields[field], BIT(bit), val << bit);
-}
 
 /*
  * Pin controller functionality
@@ -344,6 +313,28 @@ static int rtl8231_pinctrl_init(struct device *dev, struct rtl8231_pin_ctrl *ctr
 /*
  * GPIO controller functionality
  */
+static int rtl8231_pin_read(struct rtl8231_pin_ctrl *ctrl, int base, int offset)
+{
+	int field = base + offset / 16;
+	int bit = offset % 16;
+	unsigned int v;
+	int err;
+
+	err = regmap_field_read(ctrl->fields[field], &v);
+	if (err)
+		return err;
+
+	return !!(v & BIT(bit));
+}
+
+static int rtl8231_pin_write(struct rtl8231_pin_ctrl *ctrl, int base, int offset, int val)
+{
+	int field = base + offset / 16;
+	int bit = offset % 16;
+
+	return regmap_field_update_bits(ctrl->fields[field], BIT(bit), val << bit);
+}
+
 static int rtl8231_direction_input(struct gpio_chip *gc, unsigned int offset)
 {
 	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
@@ -481,9 +472,9 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 	ctrl->gc.label = pdev->name;
 	ctrl->gc.owner = THIS_MODULE;
 	ctrl->gc.can_sleep = true;
-	/* Either use parent device, or set gc.of_node explicitly */
 	ctrl->gc.parent = dev;
 #if defined(CONFIG_OF_GPIO)
+	/* Either use parent device, or set gc.of_node explicitly */
 	ctrl->gc.of_node = dev->parent->of_node;
 #endif
 
