@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <linux/bits.h>
+#include <linux/delay.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/rtl8231.h>
 #include <linux/mdio.h>
@@ -50,10 +51,9 @@ static int rtl8231_init(struct device *dev, struct regmap *map)
 		goto out;
 	}
 
-	// TODO Implement reset-gpios?
-	// TODO soft reset?
-	//regmap_update_bits(map, RTL8231_REG_PIN_HI_CFG, RTL8231_RESET_MASK, RTL8231_RESET_MASK);
-	//msleep(1);
+	// TODO Implement reset-gpios
+	regmap_update_bits(map, RTL8231_REG_PIN_HI_CFG, RTL8231_RESET_MASK, RTL8231_RESET_MASK);
+	msleep(1);
 
 	/* Do not write LED_START before configuring pins */
 	/* Select GPIO functionality for all pins and set to input */
