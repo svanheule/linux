@@ -227,6 +227,31 @@ static struct pinmux_ops rtl8231_pinmux_ops = {
 	.strict = true
 };
 
+// TODO pin_config_set
+// TODO pin_config_group_set
+
+//static int rtl8231_pin_config_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned int *config)
+//{
+//	struct rtl8231_pin_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
+//	enum pin_config_param param = pinconf_to_config_param(*config);
+//	int ret;
+//
+//	switch (param) {
+//	case PIN_CONFIG_INPUT_DEBOUNCE:
+//		if (pin < 31)
+//			return -ENOTSUPP;
+//		ret = rtl8231_pin_read(ctrl, RTL8231_FIELD_DEBOUNCE, pin - 31);
+//		if (ret < 0)
+//			return ret;
+//		*config = pinconf_to_config_packed(param, ret ? 100000 : 0);
+//		break;
+//	default:
+//		return -ENOTSUPP;
+//	}
+//
+//	return 0;
+//}
+
 static struct pinctrl_desc rtl8231_pctl_desc = {
 	.name = "rtl8231-pinctrl",
 	.owner = THIS_MODULE,
@@ -436,6 +461,32 @@ static void rtl8231_gpio_set_multiple(struct gpio_chip *gc,
 		read += 16;
 	}
 }
+
+//static int rtl8231_gpio_set_config(struct gpio_chip *gc, unsigned int offset, unsigned long config)
+//{
+//	enum pin_config_param param = pinconf_to_config_param(config);
+//	u32 arg = pinconf_to_config_argument(config);
+//	struct rtl8231_pin_ctrl *ctrl = gpiochip_get_data(gc);
+//
+//	if (param == PIN_CONFIG_INPUT_DEBOUNCE) {
+//		if (offset < 31) {
+//			dev_err(gc->parent, "input-debounce is not available for GPIO%d\n", offset);
+//			return -EINVAL;
+//		}
+//		if (arg != 100000 && arg != 0) {
+//			dev_warn(gc->parent, "input-debounce must be 100 ms or disabled, clamping to 100ms\n");
+//		}
+//
+//		if (arg == 0)
+//			rtl8231_pin_write(ctrl, RTL8231_FIELD_DEBOUNCE, offset - 31, 0);
+//		else
+//			rtl8231_pin_write(ctrl, RTL8231_FIELD_DEBOUNCE, offset - 31, 1);
+//
+//		return 0;
+//	}
+//
+//	return -EINVAL;
+//}
 
 static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 {
