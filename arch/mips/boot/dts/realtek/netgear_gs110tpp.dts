@@ -86,18 +86,22 @@
 		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
 			<&gpio0 3 GPIO_ACTIVE_HIGH>;
 
-		expander31: gpio-expander@31 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_mdx_pins>;
+
+		gpio1: gpio-expander@31 {
+			compatible = "realtek,rtl8231";
 			reg = <31>;
+
+			#gpio-cells = <2>;
+			gpio-controller;
+			ngpios = <37>;
+
+			led_pins: led_cfg {
+				pins = "gpio31", "gpio32", "gpio34";
+				function = "gpio";
+			};
 		};
-	};
-
-	gpio1: rtl8231 {
-		compatible = "realtek,rtl8231-mdio";
-		#gpio-cells = <2>;
-		gpio-controller;
-		ngpios = <37>;
-
-		dev-handle = <&expander31>;
 	};
 };
 
