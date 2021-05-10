@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
+#include <linux/bits.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/rtl8231.h>
 #include <linux/mdio.h>
