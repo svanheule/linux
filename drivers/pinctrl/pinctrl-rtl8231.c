@@ -187,7 +187,8 @@ static int rtl8231_get_function_groups(struct pinctrl_dev *pctldev, unsigned int
 	return 0;
 }
 
-static int rtl8231_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector, unsigned int group_selector)
+static int rtl8231_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector,
+	unsigned int group_selector)
 {
 	struct rtl8231_pin_ctrl *ctrl = pinctrl_dev_get_drvdata(pctldev);
 	const struct rtl8231_pin_desc *desc = &rtl8231_pins[group_selector];

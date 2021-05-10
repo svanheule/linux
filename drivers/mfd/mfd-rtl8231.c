@@ -119,9 +119,8 @@ static int rtl8231_mdio_probe(struct mdio_device *mdiodev)
 	if (err)
 		return err;
 
-	return devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO,
-				    rtl8231_cells, ARRAY_SIZE(rtl8231_cells),
-				    NULL, 0, NULL);
+	return devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO, rtl8231_cells,
+		ARRAY_SIZE(rtl8231_cells), NULL, 0, NULL);
 }
 
 static void rtl8231_mdio_remove(struct mdio_device *mdiodev)
