@@ -540,9 +540,16 @@ static int rtl8231_pinctrl_probe(struct platform_device *pdev)
 	return devm_gpiochip_add_data(dev, &ctrl->gc, ctrl);
 }
 
+static const struct of_device_id rtl8231_of_match[] = {
+	{ .compatible = "realtek,rtl8231-pinctrl" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, rtl8231_of_match);
+
 static struct platform_driver rtl8231_pinctrl_driver = {
 	.driver = {
 		.name = "rtl8231-pinctrl",
+		.of_match_table = rtl8231_of_match,
 	},
 	.probe = rtl8231_pinctrl_probe,
 };
