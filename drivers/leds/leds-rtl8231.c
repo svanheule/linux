@@ -34,8 +34,8 @@ struct rtl8231_led {
 #define RTL8231_LED_PER_REG	5
 #define RTL8231_BITS_PER_LED	3
 
-static const unsigned int rtl8231_led_port_count_single[RTL8231_NUM_LEDS] = {32, 32, 24};
-static const unsigned int rtl8231_led_port_count_bicolor[RTL8231_NUM_LEDS] = {24, 24, 24};
+static const unsigned int rtl8231_led_port_counts_single[RTL8231_NUM_LEDS] = {32, 32, 24};
+static const unsigned int rtl8231_led_port_counts_bicolor[RTL8231_NUM_LEDS] = {24, 24, 24};
 
 static const unsigned int rtl8231_led_base[RTL8231_NUM_LEDS] = {
 	RTL8231_REG_LED0_BASE,
@@ -177,7 +177,7 @@ static struct reg_field rtl8231_led_get_field(unsigned int port_index, unsigned 
 }
 
 static int rtl8231_led_probe_single(struct device *dev, struct regmap *map,
-	const unsigned int *port_count, struct device_node *np)
+	const unsigned int *port_counts, struct device_node *np)
 {
 	struct rtl8231_led *pled;
 	unsigned int port_index;
@@ -195,7 +195,7 @@ static int rtl8231_led_probe_single(struct device *dev, struct regmap *map,
 	if (err) {
 		dev_err(dev, "LED address invalid\n");
 		return err;
-	} else if (led_index >= RTL8231_NUM_LEDS || port_index >= port_count[led_index]) {
+	} else if (led_index >= RTL8231_NUM_LEDS || port_index >= port_counts[led_index]) {
 		dev_err(dev, "LED address (%d.%d) invalid\n", port_index, led_index);
 		return -ENODEV;
 	}
@@ -220,7 +220,7 @@ static int rtl8231_led_probe_single(struct device *dev, struct regmap *map,
 static int rtl8231_led_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	const unsigned int *port_count;
+	const unsigned int *port_counts;
 	struct device_node *child;
 	struct regmap *map;
 	int err;
@@ -235,11 +235,11 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 	}
 
 	if (!device_property_match_string(dev, "realtek,led-scan-mode", "single-color")) {
-		port_count = rtl8231_led_port_count_single;
+		port_counts = rtl8231_led_port_counts_single;
 		regmap_update_bits(map, RTL8231_REG_FUNC0,
 			RTL8231_FUNC0_SCAN_MODE, RTL8231_FUNC0_SCAN_SINGLE);
 	} else if (!device_property_match_string(dev, "realtek,led-scan-mode", "bi-color")) {
-		port_count = rtl8231_led_port_count_bicolor;
+		port_counts = rtl8231_led_port_counts_bicolor;
 		regmap_update_bits(map, RTL8231_REG_FUNC0,
 			RTL8231_FUNC0_SCAN_MODE, RTL8231_FUNC0_SCAN_BICOLOR);
 	} else {
@@ -249,7 +249,7 @@ static int rtl8231_led_probe(struct platform_device *pdev)
 
 	for_each_child_of_node(dev->of_node, child) {
 		if (of_node_name_prefix(child, "led")) {
-			err = rtl8231_led_probe_single(dev, map, port_count, child);
+			err = rtl8231_led_probe_single(dev, map, port_counts, child);
 			if (err)
 				dev_warn(dev, "failed to register %pOF\n", child);
 			continue;
