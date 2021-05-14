@@ -38,7 +38,7 @@ static int rtl8231_init(struct device *dev, struct regmap *map)
 	field_soft_reset = regmap_field_alloc(map, RTL8231_FIELD_SOFT_RESET);
 	if (IS_ERR(field_soft_reset)) {
 		err = PTR_ERR(field_soft_reset);
-		goto init_out;
+		goto init_out_free_ready_code;
 	}
 
 	err = regmap_field_read(field_ready_code, &v);
@@ -66,8 +66,9 @@ static int rtl8231_init(struct device *dev, struct regmap *map)
 	regmap_write(map, RTL8231_REG_PIN_HI_CFG, GENMASK(4, 0) | GENMASK(9, 5));
 
 init_out:
-	regmap_field_free(field_ready_code);
 	regmap_field_free(field_soft_reset);
+init_out_free_ready_code:
+	regmap_field_free(field_ready_code);
 	return err;
 }
 
