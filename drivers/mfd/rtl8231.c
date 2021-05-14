@@ -2,11 +2,13 @@
 
 #include <linux/bits.h>
 #include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/rtl8231.h>
 #include <linux/mdio.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 
 static const struct reg_field RTL8231_FIELD_LED_START = REG_FIELD(RTL8231_REG_FUNC0, 1, 1);
@@ -53,7 +55,6 @@ static int rtl8231_init(struct device *dev, struct regmap *map)
 		goto init_out;
 	}
 
-	// TODO Implement reset-gpios
 	regmap_field_write(field_soft_reset, 1);
 	usleep_range(1000, 10000);
 
@@ -123,6 +124,10 @@ static int rtl8231_mdio_probe(struct mdio_device *mdiodev)
 		return PTR_ERR(led_start);
 
 	dev_set_drvdata(dev, led_start);
+
+	mdiodev->reset_gpio = gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
+	device_property_read_u32(dev, "reset-assert-delay", &mdiodev->reset_assert_delay);
+	device_property_read_u32(dev, "reset-deassert-delay", &mdiodev->reset_deassert_delay);
 
 	err = rtl8231_init(dev, map);
 	if (err)
