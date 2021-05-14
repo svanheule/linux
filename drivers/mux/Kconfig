@@ -58,4 +58,16 @@ config MUX_MMIO
 	  To compile the driver as a module, choose M here: the module will
 	  be called mux-mmio.
 
+config MUX_VIRTUAL
+	tristate "Virtual multiplexer controller"
+	depends on OF || COMPILE_TEST
+	help
+	  Virtual multiplexer controller.
+
+	  For devices that need shared resource access which can be used by
+	  only one device at a time.
+
+	  To compile the driver as a module, choose M here: the module will
+	  be called mux-virtual.
+
 endmenu
