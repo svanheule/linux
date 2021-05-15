@@ -170,12 +170,23 @@ static int gpio_regmap_direction_input(struct gpio_chip *chip,
 	return gpio_regmap_set_direction(chip, offset, false);
 }
 
-static int gpio_regmap_direction_output(struct gpio_chip *chip,
-					unsigned int offset, int value)
+static int gpio_regmap_dir_out_val_first(struct gpio_chip *chip,
+					 unsigned int offset, int value)
 {
 	gpio_regmap_set(chip, offset, value);
 
 	return gpio_regmap_set_direction(chip, offset, true);
+}
+
+static int gpio_regmap_dir_out_dir_first(struct gpio_chip *chip,
+					 unsigned int offset, int value)
+{
+	int err;
+
+	err = gpio_regmap_set_direction(chip, offset, true);
+	gpio_regmap_set(chip, offset, value);
+
+	return err;
 }
 
 void gpio_regmap_set_drvdata(struct gpio_regmap *gpio, void *data)
@@ -277,7 +288,10 @@ struct gpio_regmap *gpio_regmap_register(const struct gpio_regmap_config *config
 	if (gpio->reg_dir_in_base || gpio->reg_dir_out_base) {
 		chip->get_direction = gpio_regmap_get_direction;
 		chip->direction_input = gpio_regmap_direction_input;
-		chip->direction_output = gpio_regmap_direction_output;
+		if (config->no_set_on_input)
+			chip->direction_output = gpio_regmap_dir_out_dir_first;
+		else
+			chip->direction_output = gpio_regmap_dir_out_val_first;
 	}
 
 	ret = gpiochip_add_data(chip, gpio);

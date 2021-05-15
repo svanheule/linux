@@ -30,6 +30,8 @@ struct regmap;
  * @reg_dir_out_base:	(Optional) out setting register base address
  * @reg_stride:		(Optional) May be set if the registers (of the
  *			same type, dat, set, etc) are not consecutive.
+ * @no_set_on_input:	Set if output value can only be set when the direction
+ *			is configured as output.
  * @ngpio_per_reg:	Number of GPIOs per register
  * @irq_domain:		(Optional) IRQ domain if the controller is
  *			interrupt-capable
@@ -73,6 +75,7 @@ struct gpio_regmap_config {
 	unsigned int reg_dir_out_base;
 	int reg_stride;
 	int ngpio_per_reg;
+	bool no_set_on_input;
 	struct irq_domain *irq_domain;
 
 	int (*reg_mask_xlate)(struct gpio_regmap *gpio, unsigned int base,
