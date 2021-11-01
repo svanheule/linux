@@ -55,6 +55,7 @@
 struct realtek_gpio_ctrl {
 	struct gpio_chip gc;
 	void __iomem *base;
+	void __iomem *cpumap_base;
 	raw_spinlock_t lock;
 	u16 intr_mask[REALTEK_GPIO_PORTS_PER_BANK];
 	u16 intr_type[REALTEK_GPIO_PORTS_PER_BANK];
@@ -76,6 +77,11 @@ enum realtek_gpio_flags {
 	 * fields, and [BA, DC] for 2-bit fields.
 	 */
 	GPIO_PORTS_REVERSED = BIT(1),
+	/*
+	 * Interrupts can be enabled per cpu. This requires a secondary IO
+	 * range, where the per-cpu enable masks are located.
+	 */
+	GPIO_INTERRUPTS_PER_CPU = BIT(2),
 };
 
 static struct realtek_gpio_ctrl *irq_data_to_ctrl(struct irq_data *data)
@@ -255,6 +261,12 @@ static int realtek_gpio_irq_init(struct gpio_chip *gc)
 	for (port = 0; (port * 8) < gc->ngpio; port++) {
 		realtek_gpio_write_imr(ctrl, port, 0, 0);
 		realtek_gpio_clear_isr(ctrl, port, GENMASK(7, 0));
+
+		if (ctrl->cpumap_base) {
+			/* Default CPU affinity to the first CPU */
+			iowrite8(GENMASK(7, 0),
+				ctrl->cpumap_base + ctrl->port_offset_u8(port));
+		}
 	}
 
 	return 0;
@@ -351,6 +363,13 @@ static int realtek_gpio_probe(struct platform_device *pdev)
 			return -ENOMEM;
 		girq->parents[0] = irq;
 		girq->init_hw = realtek_gpio_irq_init;
+	}
+
+	if (dev_flags & GPIO_INTERRUPTS_PER_CPU) {
+		ctrl->cpumap_base = devm_platform_ioremap_resource(pdev, 1);
+		if (IS_ERR(ctrl->cpumap_base))
+			return dev_err_probe(dev, PTR_ERR(ctrl->cpumap_base),
+				"IRQ CPU map registers not defined");
 	}
 
 	return devm_gpiochip_add_data(dev, &ctrl->gc, ctrl);
