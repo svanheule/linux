@@ -55,19 +55,19 @@
 
 		compatible = "gpio-leds";
 
-		led_sys_red: sys_red {
+		led_sys_red: led-0 {
 			gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
 			color = <LED_COLOR_ID_RED>;
 			function = LED_FUNCTION_STATUS;
 		};
 
-		led_sys_green: sys_green {
+		led_sys_green: led-1 {
 			gpios = <&gpio1 32 GPIO_ACTIVE_LOW>;
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_STATUS;
 		};
 
-		led_sys_blue: sys_blue {
+		led_sys_blue: led-2 {
 			gpios = <&gpio1 34 GPIO_ACTIVE_LOW>;
 			color = <LED_COLOR_ID_BLUE>;
 			function = LED_FUNCTION_STATUS;
@@ -107,7 +107,7 @@
 		};
 	};
 
-	switchcore@1b000000 {
+	switchcore-bus@1b000000 {
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -129,6 +129,6 @@
 	};
 };
 
-&uart0 {
+&serial0 {
 	status = "okay";
 };
