@@ -325,6 +325,45 @@ static int led_classdev_next_name(const char *init_name, char *name,
 }
 
 /**
+ * led_classdev_init_device - initialise the device object associated with
+ *			      the led_classdev
+ *
+ * @led_cdev: the led_classdev structure for this device.
+ * @parent: parent of LED device
+ * @name: name to give to the new device
+ */
+static int led_classdev_init_device(struct led_classdev *led_cdev, struct device *parent, const char *name)
+{
+	struct device *dev;
+	int err;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev)
+		return -ENOMEM;
+
+	//led_cdev->dev = device_create_with_groups(leds_class, parent, 0,
+	//			led_cdev, led_cdev->groups, "%s", final_name);
+	device_initialize(dev);
+	dev->class = leds_class;
+	dev->parent = parent;
+	dev->groups = led_cdev->groups;
+	dev->release = kfree;
+	dev_set_drvdata(dev, led_cdev);
+
+	err = dev_set_name(dev, "%s", name);
+	if (err)
+		goto device_error;
+
+	led_cdev->dev = dev;
+
+	return 0;
+
+device_error:
+	put_device(dev);
+	return err;
+}
+
+/**
  * led_classdev_register_ext - register a new object of led_classdev class
  *			       with init data.
  *
@@ -369,15 +408,20 @@ int led_classdev_register_ext(struct device *parent,
 
 	mutex_init(&led_cdev->led_access);
 	mutex_lock(&led_cdev->led_access);
-	led_cdev->dev = device_create_with_groups(leds_class, parent, 0,
-				led_cdev, led_cdev->groups, "%s", final_name);
-	if (IS_ERR(led_cdev->dev)) {
+	ret = led_classdev_init_device(led_classdev, parent, final_name);
+	if (ret) {
 		mutex_unlock(&led_cdev->led_access);
-		return PTR_ERR(led_cdev->dev);
+		return ret;
 	}
 	if (init_data && init_data->fwnode) {
 		led_cdev->dev->fwnode = init_data->fwnode;
 		led_cdev->dev->of_node = to_of_node(init_data->fwnode);
+
+	ret = dev_add(led_cdev->dev);
+	if (ret) {
+		put_device(led_cdev->dev);
+		mutex_unlock(&led_cdev->led_access);
+		return ret;
 	}
 
 	if (ret)
