@@ -99,5 +99,19 @@
 			interrupt-parent = <&intc>;
 			interrupts = <23>;
 		};
+
+		watchdog: watchdog@3150 {
+			compatible = "realtek,rtl8380-wdt";
+			reg = <0x3150 0xc>;
+
+			realtek,reset-mode = "soc";
+
+			clocks = <&lx_clk>;
+			timeout-sec = <20>;
+
+			interrupt-parent = <&intc>;
+			interrupt-names = "phase1", "phase2";
+			interrupts = <19>, <18>;
+		};
 	};
 };
