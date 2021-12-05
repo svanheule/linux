@@ -16,6 +16,12 @@
 		interrupt-controller;
 	};
 
+	lx_clk: lx_clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <200000000>;
+	};
+
 	soc: soc@18000000 {
 		compatible = "simple-bus";
 		#address-cells = <1>;
@@ -26,7 +32,7 @@
 			compatible = "ns16550a";
 			reg = <0x2000 0x100>;
 
-			clock-frequency = <200000000>;
+			clocks = <&lx_clk>;
 
 			interrupt-parent = <&intc>;
 			interrupts = <31>;
@@ -43,7 +49,7 @@
 			compatible = "ns16550a";
 			reg = <0x2100 0x100>;
 
-			clock-frequency = <200000000>;
+			clocks = <&lx_clk>;
 
 			interrupt-parent = <&intc>;
 			interrupts = <30>;
