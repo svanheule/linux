@@ -35,7 +35,7 @@
 			clocks = <&lx_clk>;
 
 			interrupt-parent = <&intc>;
-			interrupts = <31>;
+			interrupts = <31 1>;
 
 			reg-io-width = <1>;
 			reg-shift = <2>;
@@ -52,7 +52,7 @@
 			clocks = <&lx_clk>;
 
 			interrupt-parent = <&intc>;
-			interrupts = <30>;
+			interrupts = <30 0>;
 
 			reg-io-width = <1>;
 			reg-shift = <2>;
@@ -63,29 +63,13 @@
 		};
 
 		intc: interrupt-controller@3000 {
-			compatible = "realtek,rtl-intc";
-			reg = <0x3000 0x20>;
+			compatible = "realtek,rtl8380-intc", "realtek,rtl-intc";
+			reg = <0x3000 0x18>;
 			interrupt-controller;
-			#interrupt-cells = <1>;
-			interrupt-parent = <&cpuintc>;
-			interrupts = <2>, <3>, <4>, <5>, <6>/*, <7>*/;
+			#interrupt-cells = <2>;
 
-			#address-cells = <0>;
-			interrupt-map =
-				<31 &cpuintc 2>, /* UART0 */
-				<30 &cpuintc 1>, /* UART1 */
-				<29 &cpuintc 5>, /* TC0 */
-				<28 &cpuintc 1>, /* TC1 */
-				<27 &cpuintc 1>, /* OCPTO */
-				<26 &cpuintc 1>, /* HLXTO */
-				<25 &cpuintc 1>, /* SLXTO */
-				<24 &cpuintc 4>, /* NIC */
-				<23 &cpuintc 4>, /* GPIO ABCD*/
-				<22 &cpuintc 4>, /* GPIO EFGH*/
-				<21 &cpuintc 4>, /* RTC */
-				<20 &cpuintc 3>, /* SWCORE */
-				<19 &cpuintc 4>, /* WFT IP1 */
-				<18 &cpuintc 5>; /* WDT IP2 */
+			interrupt-parent = <&cpuintc>;
+			interrupts = <2>, <3>, <4>, <5>, <6>;
 		};
 
 		gpio0: gpio@3500 {
@@ -99,7 +83,7 @@
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			interrupt-parent = <&intc>;
-			interrupts = <23>;
+			interrupts = <23 2>;
 		};
 
 		watchdog: watchdog@3150 {
@@ -113,7 +97,7 @@
 
 			interrupt-parent = <&intc>;
 			interrupt-names = "phase1", "phase2";
-			interrupts = <19>, <18>;
+			interrupts = <19 3>, <18 4>;
 		};
 	};
 };
