@@ -67,6 +67,8 @@
 			reg = <0x3000 0x20>;
 			interrupt-controller;
 			#interrupt-cells = <1>;
+			interrupt-parent = <&cpuintc>;
+			interrupts = <2>, <3>, <4>, <5>, <6>/*, <7>*/;
 
 			#address-cells = <0>;
 			interrupt-map =
