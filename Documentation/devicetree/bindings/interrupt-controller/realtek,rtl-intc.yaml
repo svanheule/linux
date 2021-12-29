@@ -21,14 +21,15 @@ properties:
       - items:
           - enum:
               - realtek,rtl8380-intc
+              - realtek,rtl8390-intc
+              - realtek,rtl9300-intc
           - const: realtek,rtl-intc
       - const: realtek,rtl-intc
         deprecated: true
 
   "#interrupt-cells": true
 
-  reg:
-    maxItems: 1
+  reg: true
 
   interrupts:
     minItems: 1
@@ -71,6 +72,23 @@ allOf:
           const: 2
       required:
         - interrupts
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - realtek,rtl8390-intc
+              - realtek,rtl9300-intc
+    then:
+      properties:
+        reg:
+          items:
+            - description: CPU0 control registers
+            - description: CPU1 control registers
+    else:
+      properties:
+        reg:
+          maxItems: 1
 
 additionalProperties: false
 
