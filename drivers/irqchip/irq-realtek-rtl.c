@@ -24,10 +24,12 @@
 #define RTL_ICTL_NUM_INPUTS	32
 #define RTL_ICTL_NUM_OUTPUTS	15
 
-#define REG(x)		(realtek_ictl_base + x)
-
 static DEFINE_RAW_SPINLOCK(irq_lock);
-static void __iomem *realtek_ictl_base;
+
+#define REG(offset, cpu)	(realtek_ictl_base[cpu] + offset)
+
+static void __iomem *realtek_ictl_base[NR_CPUS];
+static cpumask_t realtek_ictl_cpu_configurable;
 
 struct realtek_ictl_output {
 	/* IRQ controller data */
@@ -67,12 +69,15 @@ static void realtek_ictl_unmask_irq(struct irq_data *i)
 {
 	unsigned long flags;
 	u32 value;
+	int cpu;
 
 	raw_spin_lock_irqsave(&irq_lock, flags);
 
-	value = readl(REG(RTL_ICTL_GIMR));
-	value |= BIT(i->hwirq);
-	writel(value, REG(RTL_ICTL_GIMR));
+	for_each_cpu(cpu, &realtek_ictl_cpu_configurable) {
+		value = readl(REG(RTL_ICTL_GIMR, cpu));
+		value |= BIT(i->hwirq);
+		writel(value, REG(RTL_ICTL_GIMR, cpu));
+	}
 
 	raw_spin_unlock_irqrestore(&irq_lock, flags);
 }
@@ -81,28 +86,63 @@ static void realtek_ictl_mask_irq(struct irq_data *i)
 {
 	unsigned long flags;
 	u32 value;
+	int cpu;
 
 	raw_spin_lock_irqsave(&irq_lock, flags);
 
-	value = readl(REG(RTL_ICTL_GIMR));
-	value &= ~BIT(i->hwirq);
-	writel(value, REG(RTL_ICTL_GIMR));
+	for_each_cpu(cpu, &realtek_ictl_cpu_configurable) {
+		value = readl(REG(RTL_ICTL_GIMR, cpu));
+		value &= ~BIT(i->hwirq);
+		writel(value, REG(RTL_ICTL_GIMR, cpu));
+	}
 
 	raw_spin_unlock_irqrestore(&irq_lock, flags);
+}
+
+static int realtek_ictl_irq_affinity(struct irq_data *i,
+	const struct cpumask *dest, bool force)
+{
+	struct realtek_ictl_output *output = i->domain->host_data;
+	cpumask_t cpu_configure;
+	cpumask_t cpu_disable;
+	cpumask_t cpu_enable;
+	unsigned long flags;
+	int cpu;
+
+	raw_spin_lock_irqsave(&irq_lock, flags);
+
+	cpumask_and(&cpu_configure, cpu_present_mask, &realtek_ictl_cpu_configurable);
+	cpumask_and(&cpu_enable, &cpu_configure, dest);
+	cpumask_andnot(&cpu_disable, &cpu_configure, dest);
+
+	for_each_cpu(cpu, &cpu_disable)
+		write_irr(REG(RTL_ICTL_IRR0, cpu), i->hwirq, 0);
+
+	for_each_cpu(cpu, &cpu_enable)
+		write_irr(REG(RTL_ICTL_IRR0, cpu), i->hwirq, output->output_index + 1);
+
+	irq_data_update_effective_affinity(i, &cpu_enable);
+
+	raw_spin_unlock_irqrestore(&irq_lock, flags);
+
+	return IRQ_SET_MASK_OK;
 }
 
 static struct irq_chip realtek_ictl_irq = {
 	.name = "realtek-rtl-intc",
 	.irq_mask = realtek_ictl_mask_irq,
 	.irq_unmask = realtek_ictl_unmask_irq,
+	.irq_set_affinity = realtek_ictl_irq_affinity,
 };
 
 static int intc_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
 {
 	struct realtek_ictl_output *output = d->host_data;
+	struct irq_data *irqd;
 	unsigned long flags;
 	u32 routing_old;
 	int err = 0;
+	int cpu;
 
 	raw_spin_lock_irqsave(&irq_lock, flags);
 
@@ -111,16 +151,21 @@ static int intc_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
 	 * multiple domains. Perform this check in the same atomic context as
 	 * configuring the routing to prevent races.
 	 */
-	routing_old = read_irr(REG(RTL_ICTL_IRR0), hw);
-	if (routing_old && output->output_index != routing_old - 1) {
-		pr_err("int %ld already routed to output %d\n",
-			hw, routing_old - 1);
-		err = -EINVAL;
-		goto out;
+	for_each_cpu(cpu, &realtek_ictl_cpu_configurable) {
+		routing_old = read_irr(REG(RTL_ICTL_IRR0, cpu), hw);
+		if (routing_old && output->output_index != routing_old - 1) {
+			pr_err("int %ld already routed to output %d\n",
+				hw, routing_old - 1);
+			err = -EINVAL;
+			goto out;
+		}
 	}
 
 	output->child_mask |= BIT(hw);
-	write_irr(REG(RTL_ICTL_IRR0), hw, output->output_index + 1);
+	write_irr(REG(RTL_ICTL_IRR0, 0), hw, output->output_index + 1);
+
+	irqd = irq_get_irq_data(irq);
+	irq_data_update_effective_affinity(irqd, cpumask_of(0));
 
 	irq_set_chip_and_handler(irq, &realtek_ictl_irq, handle_level_irq);
 
@@ -155,11 +200,12 @@ static void realtek_irq_dispatch(struct irq_desc *desc)
 {
 	struct realtek_ictl_output *output = irq_desc_get_handler_data(desc);
 	struct irq_chip *chip = irq_desc_get_chip(desc);
+	int cpu = smp_processor_id();
 	unsigned long pending;
 	unsigned int soc_int;
 
 	chained_irq_enter(chip, desc);
-	pending = readl(REG(RTL_ICTL_GIMR)) & readl(REG(RTL_ICTL_GISR))
+	pending = readl(REG(RTL_ICTL_GIMR, cpu)) & readl(REG(RTL_ICTL_GISR, cpu))
 		& output->child_mask;
 
 	if (unlikely(!pending)) {
@@ -221,15 +267,24 @@ static int __init realtek_rtl_of_init(struct device_node *node, struct device_no
 	unsigned int num_parents;
 	unsigned int soc_irq;
 	unsigned int p;
+	int cpu;
 
-	realtek_ictl_base = of_iomap(node, 0);
-	if (!realtek_ictl_base)
+	cpumask_clear(&realtek_ictl_cpu_configurable);
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		realtek_ictl_base[cpu] = of_iomap(node, cpu);
+		if (realtek_ictl_base[cpu]) {
+			cpumask_set_cpu(cpu, &realtek_ictl_cpu_configurable);
+
+			/* Disable all cascaded interrupts and clear routing */
+			writel(0, REG(RTL_ICTL_GIMR, cpu));
+			for (soc_irq = 0; soc_irq < RTL_ICTL_NUM_INPUTS; soc_irq++)
+				write_irr(REG(RTL_ICTL_IRR0, cpu), soc_irq, 0);
+		}
+	}
+
+	if (cpumask_empty(&realtek_ictl_cpu_configurable))
 		return -ENXIO;
-
-	/* Disable all cascaded interrupts and clear routing */
-	writel(0, REG(RTL_ICTL_GIMR));
-	for (soc_irq = 0; soc_irq < RTL_ICTL_NUM_INPUTS; soc_irq++)
-		write_irr(REG(RTL_ICTL_IRR0), soc_irq, 0);
 
 	num_parents = of_irq_count(node);
 	if (num_parents > RTL_ICTL_NUM_OUTPUTS) {
