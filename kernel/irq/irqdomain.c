@@ -1902,11 +1902,36 @@ static int irq_domain_debug_show(struct seq_file *m, void *p)
 }
 DEFINE_SHOW_ATTRIBUTE(irq_domain_debug);
 
+static int debugfs_domain_dir_nextname(const char *proposed, char *final, size_t len)
+{
+	struct dentry *f;
+	unsigned int i = 0;
+	int ret = 0;
+
+	strlcpy(final, proposed, len);
+
+	while (ret < len && (f = debugfs_lookup(final, domain_dir))) {
+		dput(f);
+		ret = snprintf(final, len, "%s_%d", proposed, ++i);
+	}
+
+	if (ret >= len)
+		return -ENOMEM;
+
+	return i;
+}
+
 static void debugfs_add_domain_dir(struct irq_domain *d)
 {
+	char final_name[64];
+
 	if (!d->name || !domain_dir)
 		return;
-	debugfs_create_file(d->name, 0444, domain_dir, d,
+
+	if (debugfs_domain_dir_nextname(d->name, final_name, sizeof(final_name)) < 0)
+		return;
+
+	debugfs_create_file(final_name, 0444, domain_dir, d,
 			    &irq_domain_debug_fops);
 }
 
