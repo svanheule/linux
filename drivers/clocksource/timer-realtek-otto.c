@@ -89,12 +89,8 @@ static void otto_tc_set_divisor(struct otto_tc_ctrl *ctrl, u16 divisor)
 static void otto_tc_set_timeout(struct clock_event_device *ced, u32 value)
 {
 	struct timer_of *to = to_timer_of(ced);
-	struct otto_tc_ctrl *ctrl = otto_tc_timer_to_ctrl(to);
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctrl->lock, flags);
 	writel(value, OTTO_TC_REG_DATA(to));
-	spin_unlock_irqrestore(&ctrl->lock, flags);
 }
 
 /*
