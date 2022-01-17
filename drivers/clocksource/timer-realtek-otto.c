@@ -22,6 +22,7 @@
 #include <linux/clocksource.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/slab.h>
 
 #include "timer-of.h"
 
