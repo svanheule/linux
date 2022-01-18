@@ -26,9 +26,9 @@
 
 static DEFINE_RAW_SPINLOCK(irq_lock);
 
-#define REG(offset, cpu)	(realtek_ictl_base[cpu] + offset)
+#define REG(offset, cpu)	(per_cpu(realtek_ictl_base, cpu) + offset)
 
-static void __iomem *realtek_ictl_base[NR_CPUS];
+static DEFINE_PER_CPU(void __iomem*, realtek_ictl_base);
 static cpumask_t realtek_ictl_cpu_configurable;
 
 struct realtek_ictl_output {
@@ -271,16 +271,17 @@ static int __init realtek_rtl_of_init(struct device_node *node, struct device_no
 
 	cpumask_clear(&realtek_ictl_cpu_configurable);
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		realtek_ictl_base[cpu] = of_iomap(node, cpu);
-		if (realtek_ictl_base[cpu]) {
-			cpumask_set_cpu(cpu, &realtek_ictl_cpu_configurable);
+	for (cpu = 0; cpu < num_present_cpus(); cpu++) {
+		per_cpu(realtek_ictl_base, cpu) = of_iomap(node, cpu);
+		if (!per_cpu(realtek_ictl_base, cpu))
+			break;
 
-			/* Disable all cascaded interrupts and clear routing */
-			writel(0, REG(RTL_ICTL_GIMR, cpu));
-			for (soc_irq = 0; soc_irq < RTL_ICTL_NUM_INPUTS; soc_irq++)
-				write_irr(REG(RTL_ICTL_IRR0, cpu), soc_irq, 0);
-		}
+		cpumask_set_cpu(cpu, &realtek_ictl_cpu_configurable);
+
+		/* Disable all cascaded interrupts and clear routing */
+		writel(0, REG(RTL_ICTL_GIMR, cpu));
+		for (soc_irq = 0; soc_irq < RTL_ICTL_NUM_INPUTS; soc_irq++)
+			write_irr(REG(RTL_ICTL_IRR0, cpu), soc_irq, 0);
 	}
 
 	if (cpumask_empty(&realtek_ictl_cpu_configurable))
