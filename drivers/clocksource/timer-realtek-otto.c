@@ -40,6 +40,8 @@ struct otto_tc_ctrl {
 
 #define OTTO_TC_REG_CTL(to)		OTTO_TC_REG_OFFSET(to, 0x8)
 #define OTTO_TC_CTL_ENABLE		BIT(28)
+#define OTTO_TC_STOPPED			FIELD_PREP(OTTO_TC_CTL_ENABLE, 0)
+#define OTTO_TC_RUNNING			FIELD_PREP(OTTO_TC_CTL_ENABLE, 1)
 #define OTTO_TC_CTL_MODE		BIT(24)
 #define OTTO_TC_MODE_ONESHOT		FIELD_PREP(OTTO_TC_CTL_MODE, 0)
 #define OTTO_TC_MODE_REPEAT		FIELD_PREP(OTTO_TC_CTL_MODE, 1)
@@ -93,12 +95,7 @@ static void otto_tc_set_timeout(struct clock_event_device *ced, u32 value)
 	writel(value, OTTO_TC_REG_DATA(to));
 }
 
-/*
- * Timers can only be (re)started from the disabled state. The clkevt state
- * machine is expected perform the necessary disables (shutdown) before moving
- * a timer into an enabled state through .set_oneshot() or .set_periodic().
- */
-static void otto_tc_set_mode(struct clock_event_device *ced, bool started, u32 mode)
+static void otto_tc_set_mode(struct clock_event_device *ced, u32 running, u32 mode)
 {
 	struct timer_of *to = to_timer_of(ced);
 	struct otto_tc_ctrl *ctrl = otto_tc_timer_to_ctrl(to);
@@ -107,18 +104,20 @@ static void otto_tc_set_mode(struct clock_event_device *ced, bool started, u32 m
 
 	spin_lock_irqsave(&ctrl->lock, flags);
 	val = readl(OTTO_TC_REG_CTL(to));
-	val = (val & ~OTTO_TC_CTL_MODE) | mode;
-	if (started)
-		val |= OTTO_TC_CTL_ENABLE;
-	else
-		val &= ~OTTO_TC_CTL_ENABLE;
+	/* Always disable before (re)starting */
+	if (val & OTTO_TC_CTL_ENABLE)
+		writel(val & ~OTTO_TC_CTL_ENABLE, OTTO_TC_REG_CTL(to));
+	/* New mode and maybe re-enable */
+	val = (val & ~OTTO_TC_CTL_MODE) | running | mode;
 	writel(val, OTTO_TC_REG_CTL(to));
 	spin_unlock_irqrestore(&ctrl->lock, flags);
 }
 
 static int otto_tc_set_next_event(unsigned long evt, struct clock_event_device *ced)
 {
+	/* Set the new timeout and retrigger the timer */
 	otto_tc_set_timeout(ced, evt);
+	otto_tc_set_mode(ced, OTTO_TC_RUNNING, OTTO_TC_MODE_ONESHOT);
 
 	return 0;
 }
@@ -128,21 +127,21 @@ static int otto_tc_set_periodic(struct clock_event_device *ced)
 	struct timer_of *to = to_timer_of(ced);
 
 	otto_tc_set_timeout(ced, timer_of_period(to));
-	otto_tc_set_mode(ced, true, OTTO_TC_MODE_REPEAT);
+	otto_tc_set_mode(ced, OTTO_TC_RUNNING, OTTO_TC_MODE_REPEAT);
 
 	return 0;
 }
 
 static int otto_tc_set_oneshot(struct clock_event_device *ced)
 {
-	otto_tc_set_mode(ced, true, OTTO_TC_MODE_ONESHOT);
+	otto_tc_set_mode(ced, OTTO_TC_RUNNING, OTTO_TC_MODE_ONESHOT);
 
 	return 0;
 }
 
 static int otto_tc_set_oneshot_stopped(struct clock_event_device *ced)
 {
-	otto_tc_set_mode(ced, false, OTTO_TC_MODE_ONESHOT);
+	otto_tc_set_mode(ced, OTTO_TC_STOPPED, OTTO_TC_MODE_ONESHOT);
 
 	return 0;
 }
