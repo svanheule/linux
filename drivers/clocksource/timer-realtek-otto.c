@@ -165,7 +165,7 @@ static void __init otto_tc_init_clkevt(struct timer_of *to)
 	ced->set_state_oneshot = otto_tc_set_oneshot;
 	ced->set_state_oneshot_stopped = otto_tc_set_oneshot_stopped;
 	ced->set_state_shutdown = otto_tc_set_shutdown;
-	ced->cpumask = cpumask_of(0);
+	ced->cpumask = cpu_present_mask;
 	ced->rating = 300;
 
 	clockevents_config_and_register(ced, timer_of_rate(to), 1, OTTO_TC_MAX_PERIOD);
