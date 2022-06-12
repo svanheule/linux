@@ -70,20 +70,20 @@
 
 			#address-cells = <0>;
 			interrupt-map =
-				<31 &cpuintc 2>, /* UART0 */
-				<30 &cpuintc 1>, /* UART1 */
-				<29 &cpuintc 5>, /* TC0 */
-				<28 &cpuintc 1>, /* TC1 */
-				<27 &cpuintc 1>, /* OCPTO */
-				<26 &cpuintc 1>, /* HLXTO */
-				<25 &cpuintc 1>, /* SLXTO */
-				<24 &cpuintc 4>, /* NIC */
-				<23 &cpuintc 4>, /* GPIO ABCD*/
-				<22 &cpuintc 4>, /* GPIO EFGH*/
-				<21 &cpuintc 4>, /* RTC */
-				<20 &cpuintc 3>, /* SWCORE */
-				<19 &cpuintc 4>, /* WFT IP1 */
-				<18 &cpuintc 5>; /* WDT IP2 */
+				<31 &cpuintc 3>, /* UART0 */
+				<30 &cpuintc 2>, /* UART1 */
+				<29 &cpuintc 6>, /* TC0 */
+				<28 &cpuintc 2>, /* TC1 */
+				<27 &cpuintc 2>, /* OCPTO */
+				<26 &cpuintc 2>, /* HLXTO */
+				<25 &cpuintc 2>, /* SLXTO */
+				<24 &cpuintc 5>, /* NIC */
+				<23 &cpuintc 5>, /* GPIO ABCD*/
+				<22 &cpuintc 5>, /* GPIO EFGH*/
+				<21 &cpuintc 5>, /* RTC */
+				<20 &cpuintc 4>, /* SWCORE */
+				<19 &cpuintc 5>, /* WFT IP1 */
+				<18 &cpuintc 6>; /* WDT IP2 */
 		};
 
 		gpio0: gpio@3500 {
