@@ -78,8 +78,8 @@
 		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
 			<&gpio0 3 GPIO_ACTIVE_HIGH>;
 
-//		pinctrl-names = "default";
-//		pinctrl-0 = <&gpio_mdx_pins>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&aux_mdio_pins>;
 
 		reset-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
 		reset-delay-us = <1000>;
@@ -113,41 +113,6 @@
 		};
 	};
 
-//	switchcore-bus@1b000000 {
-//		compatible = "simple-bus";
-//		#address-cells = <1>;
-//		#size-cells = <1>;
-//		ranges = <0x0 0x1b000000 0x10000>;
-//
-//		pinctrl_sysled: pinmux@a000 {
-//			compatible = "pinctrl-single";
-//			reg = <0xa000 0x4>;
-//
-//			pinctrl-single,bit-per-mux;
-//			pinctrl-single,register-width = <32>;
-//			pinctrl-single,function-mask = <0x1>;
-//			#pinctrl-cells = <2>;
-//
-//			sys_led_pins: pinmux_sys_led_pins {
-//				pinctrl-single,bits = <0x0 0x0000 0x8000>;
-//			};
-//		};
-//
-//		pinctrl_gpio: pinmux@a0e0 {
-//			compatible = "pinctrl-single";
-//			reg = <0xa0e0 0x4>;
-//
-//			pinctrl-single,bit-per-mux;
-//			pinctrl-single,register-width = <32>;
-//			pinctrl-single,function-mask = <0x1>;
-//			#pinctrl-cells = <2>;
-//
-//			gpio_mdx_pins: pinmux_gpio_mdx_pins {
-//				pinctrl-single,bits = <0x0 0x0 0x1>;
-//			};
-//		};
-//	};
-
 	switchcore-bus@1b000000 {
 		compatible = "realtek,rtl8380-switchcore", "syscon";
 		reg = <0x1b000000 0x10000>;
@@ -156,6 +121,20 @@
 			function = "status";
 			color = <LED_COLOR_ID_GREEN>;
 			linux,default-trigger = "default-on";
+		};
+
+		pinctrl {
+			compatible = "realtek,rtl8380-pinctrl";
+
+			sys_led_pins: sys-led-mux {
+				groups = "sys-led";
+				function = "gpio";
+			};
+
+			aux_mdio_pins: aux-mdio-mux {
+				groups = "aux-mdio";
+				function = "gpio";
+			};
 		};
 
 		port-leds {
@@ -197,15 +176,6 @@
 				reg = <15 0>;
 				label = "lan8";
 				linux,default-trigger = "timer";
-			};
-		};
-
-		pinctrl {
-			compatible = "realtek,rtl8380-pinctrl";
-
-			sys_led_pins: sys-led-mux {
-				groups = "sys-led";
-				function = "gpio";
 			};
 		};
 	};
