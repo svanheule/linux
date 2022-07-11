@@ -395,6 +395,17 @@ config PINCTRL_ROCKCHIP
 	help
           This support pinctrl and GPIO driver for Rockchip SoCs.
 
+config PINCTRL_RTL_SWITCHCORE
+	tristate "Realtek switch core pinctrl driver"
+	depends on MFD_REALTEK_SWITCHCORE || COMPILE_TEST
+	select PINMUX
+	select GENERIC_PINMUX_FUNCTIONS
+	select MFD_SYSCON
+	default MACH_REALTEK_RTL
+	help
+	  Driver for pin control fields in RTL83xx and RTL93xx managed ethernet
+	  switch SoCs.
+
 config PINCTRL_SINGLE
 	tristate "One-register-per-pin type device tree based pinctrl driver"
 	depends on OF
