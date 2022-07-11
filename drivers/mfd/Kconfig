@@ -1016,6 +1016,17 @@ config MFD_RETU
 	  Retu and Tahvo are a multi-function devices found on Nokia
 	  Internet Tablets (770, N800 and N810).
 
+config MFD_REALTEK_SWITCHCORE
+	tristate "Realtek switch core driver"
+	select MFD_CORE
+	select REGMAP_MMIO
+	default MACH_REALTEK_RTL
+	help
+	  Say yes here if you want to support the switch core found in RTL838x,
+	  RTL839x, RTL930x, and RTL931x SoCs. The switch core provides ethernet
+	  functionality, and management features for the SoC like pin control.
+	  The mfd cell drivers have to be selected separately.
+
 config MFD_PCF50633
 	tristate "NXP PCF50633"
 	depends on I2C
