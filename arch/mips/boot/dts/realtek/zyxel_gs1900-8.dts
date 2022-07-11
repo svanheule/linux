@@ -39,8 +39,8 @@
 	leds {
 		compatible = "gpio-leds";
 
-//		pinctrl-names = "default";
-//		pinctrl-0 = <&sys_led_pins>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sys_led_pins>;
 
 		led_sys: led-0 {
 			gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
@@ -197,6 +197,15 @@
 				reg = <15 0>;
 				label = "lan8";
 				linux,default-trigger = "timer";
+			};
+		};
+
+		pinctrl {
+			compatible = "realtek,rtl8380-pinctrl";
+
+			sys_led_pins: sys-led-mux {
+				groups = "sys-led";
+				function = "gpio";
 			};
 		};
 	};
