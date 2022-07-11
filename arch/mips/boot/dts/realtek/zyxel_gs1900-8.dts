@@ -113,12 +113,12 @@
 		};
 	};
 
-	switchcore-bus@1b000000 {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0x0 0x1b000000 0x10000>;
-
+//	switchcore-bus@1b000000 {
+//		compatible = "simple-bus";
+//		#address-cells = <1>;
+//		#size-cells = <1>;
+//		ranges = <0x0 0x1b000000 0x10000>;
+//
 //		pinctrl_sysled: pinmux@a000 {
 //			compatible = "pinctrl-single";
 //			reg = <0xa000 0x4>;
@@ -146,51 +146,57 @@
 //				pinctrl-single,bits = <0x0 0x0 0x1>;
 //			};
 //		};
+//	};
 
-		fakebus@0 {
-			compatible = "simple-bus", "syscon";
-			reg = <0 0x10000>;
-			#address-cells = <0>;
+	switchcore-bus@1b000000 {
+		compatible = "realtek,rtl8380-switchcore", "syscon";
+		reg = <0x1b000000 0x10000>;
 
-			port-leds {
-				compatible = "realtek,rtl8380-port-led";
-				#address-cells = <2>;
-				#size-cells = <0>;
+		led-sys {
+			function = "status";
+			color = <LED_COLOR_ID_GREEN>;
+			linux,default-trigger = "default-on";
+		};
 
-				realtek,num-led = <1>;
+		port-leds {
+			compatible = "realtek,rtl8380-port-led";
+			#address-cells = <2>;
+			#size-cells = <0>;
 
-				led@8.0 {
-					reg = <8 0>;
-					label = "lan1";
-				};
-				led@9.0 {
-					reg = <9 0>;
-					label = "lan2";
-				};
-				led@10.0 {
-					reg = <10 0>;
-					label = "lan3";
-				};
-				led@11.0 {
-					reg = <11 0>;
-					label = "lan4";
-				};
-				led@12.0 {
-					reg = <12 0>;
-					label = "lan5";
-				};
-				led@13.0 {
-					reg = <13 0>;
-					label = "lan6";
-				};
-				led@14.0 {
-					reg = <14 0>;
-					label = "lan7";
-				};
-				led@15.0 {
-					reg = <15 0>;
-					label = "lan8";
-				};
+			realtek,num-led = <1>;
+
+			led@8.0 {
+				reg = <8 0>;
+				label = "lan1";
+			};
+			led@9.0 {
+				reg = <9 0>;
+				label = "lan2";
+			};
+			led@10.0 {
+				reg = <10 0>;
+				label = "lan3";
+			};
+			led@11.0 {
+				reg = <11 0>;
+				label = "lan4";
+			};
+			led@12.0 {
+				reg = <12 0>;
+				label = "lan5";
+			};
+			led@13.0 {
+				reg = <13 0>;
+				label = "lan6";
+			};
+			led@14.0 {
+				reg = <14 0>;
+				label = "lan7";
+			};
+			led@15.0 {
+				reg = <15 0>;
+				label = "lan8";
+				linux,default-trigger = "timer";
 			};
 		};
 	};
