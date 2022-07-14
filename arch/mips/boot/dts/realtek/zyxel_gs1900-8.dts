@@ -147,40 +147,53 @@
 			#address-cells = <2>;
 			#size-cells = <0>;
 
-			realtek,num-led = <1>;
-
 			led@8.0 {
 				reg = <8 0>;
 				label = "lan1";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 			led@9.0 {
 				reg = <9 0>;
 				label = "lan2";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 			led@10.0 {
 				reg = <10 0>;
 				label = "lan3";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 			led@11.0 {
 				reg = <11 0>;
 				label = "lan4";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 			led@12.0 {
 				reg = <12 0>;
 				label = "lan5";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 			led@13.0 {
 				reg = <13 0>;
 				label = "lan6";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 			led@14.0 {
 				reg = <14 0>;
 				label = "lan7";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 			led@15.0 {
 				reg = <15 0>;
 				label = "lan8";
-				linux,default-trigger = "timer";
+				realtek,hw-trigger = <0x1f>;
+				linux,default-trigger = "realtek-switchport";
 			};
 		};
 	};
