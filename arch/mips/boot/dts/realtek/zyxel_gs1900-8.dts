@@ -73,6 +73,17 @@
 		open-source;
 	};
 
+	jtag_header: connector-j11 {
+		#gpio-cells = <2>;
+		gpio-map =
+			<0 0 &gpio0 14 0>,
+			<1 0 &gpio0 11 0>,
+			<3 0 &gpio0 12 0>,
+			<4 0 &gpio0 13 0>;
+		gpio-map-mask = <0xff 0x0>;
+		gpio-map-pass-thru = <0x0 0x1>;
+	};
+
 	mdio1: mdio {
 		compatible = "virtual,mdio-gpio";
 		#address-cells = <1>;
@@ -142,6 +153,11 @@
 				groups = "uart1";
 				function = "uart1";
 			};
+
+			jtag_header_pins: jtag-mux {
+				groups = "jtag";
+				function = "gpio";
+			};
 		};
 
 		port-leds {
@@ -183,6 +199,12 @@
 			};
 		};
 	};
+};
+
+&gpio0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&jtag_header_pins>;
+
 };
 
 &serial0 {
