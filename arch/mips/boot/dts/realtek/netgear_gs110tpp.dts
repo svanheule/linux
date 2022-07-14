@@ -11,15 +11,13 @@
 #define NETGEAR_PORT_LED(phy) \
 	led@##phy##.0 { \
 		reg = <##phy 0>; \
-		realtek,hardware-managed; \
+		realtek,hw-trigger = <0x13>; \
 		color = <LED_COLOR_ID_GREEN>; \
-		function = LED_FUNCTION_LAN; \
 	}; \
 	led@##phy##.1 { \
 		reg = <##phy 1>; \
-		realtek,hardware-managed; \
+		realtek,hw-trigger = <0x0f>; \
 		color = <LED_COLOR_ID_AMBER>; \
-		function = LED_FUNCTION_LAN; \
 	}
 
 / {
@@ -42,6 +40,9 @@
 
 	keys {
 		compatible = "gpio-keys";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&sys_led_pins>;
 
 		reset {
 			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
@@ -76,6 +77,9 @@
 	};
 
 	gpio-restart {
+		pinctrl-names = "default";
+		pinctrl-0 = <&jtag_pins>;
+
 		compatible = "gpio-restart";
 		gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
 		priority = <192>;
@@ -107,24 +111,47 @@
 		};
 	};
 
-	switchcore@1b000000 {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0x0 0x1b000000 0x20000>;
+	switchcore-bus@1b000000 {
+		compatible = "realtek,rtl8380-switchcore", "syscon";
+		reg = <0x1b000000 0x10000>;
 
-		pinctrl_gpio: pinmux@a0e0 {
-			compatible = "pinctrl-single";
-			reg = <0xa0e0 0x4>;
+		pinctrl {
+			compatible = "realtek,rtl8380-pinctrl";
 
-			pinctrl-single,bit-per-mux;
-			pinctrl-single,register-width = <32>;
-			pinctrl-single,function-mask = <0x1>;
-			#pinctrl-cells = <2>;
-
-			gpio_mdx_pins: pinmux_gpio_mdx_pins {
-				pinctrl-single,bits = <0x0 0x0 0x1>;
+			sys_led_pins: sys-led-mux {
+				groups = "sys-led";
+				function = "gpio";
 			};
+
+			gpio_mdx_pins: aux-mdio-mux {
+				groups = "aux-mdio";
+				function = "gpio";
+			};
+
+			uart1_pins: uart1-mux {
+				groups = "uart1";
+				function = "uart1";
+			};
+
+			jtag_pins: jtag-mux {
+				groups = "jtag";
+				function = "gpio";
+			};
+		};
+
+		port-leds {
+			compatible = "realtek,rtl8380-port-led";
+			#address-cells = <2>;
+			#size-cells = <0>;
+
+			NETGEAR_PORT_LED(8);
+			NETGEAR_PORT_LED(9);
+			NETGEAR_PORT_LED(10);
+			NETGEAR_PORT_LED(11);
+			NETGEAR_PORT_LED(12);
+			NETGEAR_PORT_LED(13);
+			NETGEAR_PORT_LED(14);
+			NETGEAR_PORT_LED(15);
 		};
 	};
 };
@@ -151,4 +178,11 @@
 
 &serial0 {
 	status = "okay";
+};
+
+&serial1 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_pins>;
 };
