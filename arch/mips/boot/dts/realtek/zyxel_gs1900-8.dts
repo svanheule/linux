@@ -135,6 +135,11 @@
 				groups = "aux-mdio";
 				function = "gpio";
 			};
+
+			uart1_pins: uart1-mux {
+				groups = "uart1";
+				function = "uart1";
+			};
 		};
 
 		port-leds {
