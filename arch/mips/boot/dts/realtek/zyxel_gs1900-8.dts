@@ -8,10 +8,12 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/leds/common.h>
 
-#define ZYXEL_PORT_LED(phy) \
-	led@##phy##.0 { \
-		reg = <##phy 0>; \
-		realtek,hardware-managed; \
+#define ZYXEL_PORT_LED(phy)			\
+	led@##phy##.0 {				\
+		reg = <##phy 0>;		\
+		function = LED_FUNCTION_LAN;	\
+		function-enumerator = <(phy)>; 	\
+		color = <LED_COLOR_ID_GREEN>;	\
 	}
 
 / {
@@ -150,50 +152,34 @@
 			led@8.0 {
 				reg = <8 0>;
 				label = "lan1";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 			led@9.0 {
 				reg = <9 0>;
 				label = "lan2";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 			led@10.0 {
 				reg = <10 0>;
 				label = "lan3";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 			led@11.0 {
 				reg = <11 0>;
 				label = "lan4";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 			led@12.0 {
 				reg = <12 0>;
 				label = "lan5";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 			led@13.0 {
 				reg = <13 0>;
 				label = "lan6";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 			led@14.0 {
 				reg = <14 0>;
 				label = "lan7";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 			led@15.0 {
 				reg = <15 0>;
 				label = "lan8";
-				realtek,hw-trigger = <0x1f>;
-				linux,default-trigger = "realtek-switchport";
 			};
 		};
 	};
