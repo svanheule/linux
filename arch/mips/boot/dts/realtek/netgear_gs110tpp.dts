@@ -8,16 +8,18 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/leds/common.h>
 
-#define NETGEAR_PORT_LED(phy) \
-	led@##phy##.0 { \
-		reg = <##phy 0>; \
-		realtek,hw-trigger = <0x13>; \
-		color = <LED_COLOR_ID_GREEN>; \
-	}; \
-	led@##phy##.1 { \
-		reg = <##phy 1>; \
-		realtek,hw-trigger = <0x0f>; \
-		color = <LED_COLOR_ID_AMBER>; \
+#define NETGEAR_PORT_LED(phy)			\
+	led@##phy##.0 {				\
+		reg = <(phy) 0>;		\
+		color = <LED_COLOR_ID_GREEN>;	\
+		function = LED_FUNCTION_LAN;	\
+		function-enumerator = <(phy)>;	\
+	};					\
+	led@##phy##.1 {				\
+		reg = <(phy) 1>;		\
+		color = <LED_COLOR_ID_AMBER>;	\
+		function = LED_FUNCTION_LAN;	\
+		function-enumerator = <(phy)>;	\
 	}
 
 / {
