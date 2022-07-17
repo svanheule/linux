@@ -102,6 +102,33 @@ static struct led_port_group *switch_port_led_get_group(
 	return &pled->ctrl->groups[i];
 }
 
+static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_led *led, u32 trigger)
+{
+	struct switch_port_led_ctrl *ctrl = led->ctrl;
+	int rtl_trg = ctrl->cfg->trigger_xlate(trigger);
+	struct led_port_group *group;
+	u32 current_trg;
+	unsigned int i;
+	int err;
+
+	if (rtl_trg < 0)
+	       return ERR_PTR(rtl_trg);
+
+	for (i = 0; i < led->ctrl->cfg->group_count; i++) {
+		group = switch_port_led_get_group(led, i);
+		err = regmap_field_read(group->setting, &current_trg);
+		if (err)
+			return ERR_PTR(err);
+
+		if (current_trg == rtl_trg || bitmap_empty(group->ports, group->size))
+			return group;
+	}
+
+	dev_warn(ctrl->dev, "no available group for (%d,%d): 0x%02x\n",
+		led->port, led->index, rtl_trg);
+	return ERR_PTR(-ENOSPC);
+}
+
 /*
  * SoC specific implementation for RTL8380 series (Maple)
  */
@@ -304,6 +331,155 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 		RTL8380_GROUP_SETTING(1, 0),
 		RTL8380_GROUP_SETTING(1, 1),
 		RTL8380_GROUP_SETTING(1, 2),
+	},
+};
+
+/*
+ * SoC specific implementation for RTL8390 series (Cypress)
+ */
+#define RTL8390_REG_LED_GLB_CTRL		0x00e4
+#define RTL8390_REG_LED_COPR_SET_SEL_CTRL(led)	(0x00f0 + 4 * ((led)->port / 16))
+#define RTL8390_REG_LED_COPR_PMASK_CTRL(led)	(0x0110 + 4 * ((led)->port / 32))
+#define RTL8390_REG_LED_SW_CTRL			0x0128
+#define RTL8390_REG_LED_SW_P_EN_CTRL(led)	(0x012c + 4 * ((led)->port / 10))
+#define RTL8390_REG_LED_SW_P_CTRL(led)		(0x0144 + 4 * (led)->port)
+
+#define RTL8390_PORT_LED_COUNT			3
+#define RTL8390_GROUP_SETTING_WIDTH		5
+#define RTL8390_GROUP_SETTING_REG(_grp)		(0x00ec - 4 * (_grp / 2))
+#define RTL8390_GROUP_SETTING_SHIFT(_grp, _idx)	\
+	(RTL8390_GROUP_SETTING_WIDTH * ((_idx) + RTL8390_PORT_LED_COUNT * (_grp % 2)))
+#define RTL8390_GROUP_SETTING(_grp, _idx)	{				\
+		.reg = RTL8390_GROUP_SETTING_REG(_grp) ,			\
+		.lsb = RTL8390_GROUP_SETTING_SHIFT(_grp, _idx),			\
+		.msb = RTL8390_GROUP_SETTING_SHIFT(_grp, (_idx) + 1) - 1,	\
+	}
+
+static const struct led_port_modes rtl8390_port_led_modes = {
+	.off = 0,
+	.on = 7,
+	.blink = {{  32, 1},
+		  {  64, 2},
+		  { 128, 3},
+		  { 256, 4},
+		  { 512, 5},
+		  {1024, 6}}
+};
+
+static void rtl8390_port_commit(struct switch_port_led_ctrl *ctrl)
+{
+	/*
+	 * Could trigger the latching with delayed work,
+	 * but that's probably not worth the overhead
+	 */
+	regmap_write(ctrl->map, RTL8390_REG_LED_SW_CTRL, 1);
+}
+
+static int rtl8390_port_trigger_xlate(u32 port_led_trigger)
+{
+	switch (port_led_trigger) {
+	case PTRG_ACT | PTRG_LINK_10000:
+		return RTL83XX_TRIG_LINK_ACT_10G;
+	default:
+		return rtl8380_port_trigger_xlate(port_led_trigger);
+	}
+}
+
+int rtl8390_port_led_assign_group(struct switch_port_led *led, unsigned int group)
+{
+	unsigned int reg = RTL8390_REG_LED_COPR_SET_SEL_CTRL(led);
+	unsigned int shift = 2 * (led->port % 16);
+	u32 mask = GENMASK(1, 0) << shift;
+	u32 val = group << shift;
+
+	return regmap_update_bits(led->ctrl->map, reg, mask, val);
+}
+
+static int rtl8390_port_led_set_port_enabled(struct switch_port_led *led, bool enabled)
+{
+	/* Always enable a port as copper-only */
+	int reg = RTL8390_REG_LED_COPR_PMASK_CTRL(led);
+	u32 field_mask = BIT(led->port % 32);
+	u32 val = enabled ? field_mask : 0;
+
+	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
+}
+
+static int rtl8390_port_led_set_hw_managed(struct switch_port_led *led, bool hw_managed)
+{
+	int reg = RTL8390_REG_LED_SW_P_EN_CTRL(led);
+	u32 field_mask = BIT(3 * (led->port % 10) + led->index);
+	u32 val = hw_managed ? 0 : field_mask;
+
+	/* TODO requires commiting settings? */
+	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
+}
+
+static int rtl8390_port_led_write_mode(struct switch_port_led *led, unsigned int mode)
+{
+	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led);
+	unsigned int shift = led->index * 3;
+	u32 mask = GENMASK(2, 0) << shift;
+	u32 value = mode << shift;
+	int err;
+
+	err = regmap_update_bits(led->ctrl->map, reg, mask, value);
+	if (!err)
+		rtl8390_port_commit(led->ctrl);
+
+	return err;
+}
+
+static int rtl8390_port_led_read_mode(struct switch_port_led *led)
+{
+	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led);
+	unsigned int shift = led->index * 3;
+	u32 val;
+	int err;
+
+	err = regmap_read(led->ctrl->map, reg, &val);
+	if (err)
+		return err;
+
+	return (val >> shift) & GENMASK(2, 0);
+}
+
+static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, unsigned int led_count)
+{
+	u32 count_mask = GENMASK(3, 2);
+	u32 count_val = FIELD_PREP(count_mask, led_count);
+	u32 enable = GENMASK(5, 5);
+
+	return regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL,
+		count_mask | enable, count_val | enable);
+}
+
+static const struct switch_port_led_config rtl8390_port_led_config = {
+	.port_count = 52,
+	.port_led_count = 3,
+	.group_count = 4,
+	.modes = &rtl8390_port_led_modes,
+	.port_led_init = rtl8390_port_led_init,
+	.set_port_enabled = rtl8390_port_led_set_port_enabled,
+	.set_hw_managed = rtl8390_port_led_set_hw_managed,
+	.write_mode = rtl8390_port_led_write_mode,
+	.read_mode = rtl8390_port_led_read_mode,
+	.trigger_xlate = rtl8390_port_trigger_xlate,
+	.map_group = rtl_generic_port_led_map_group,
+	.assign_group = rtl8390_port_led_assign_group,
+	.group_settings = {
+		RTL8390_GROUP_SETTING(0, 0),
+		RTL8390_GROUP_SETTING(0, 1),
+		RTL8390_GROUP_SETTING(0, 2),
+		RTL8390_GROUP_SETTING(1, 0),
+		RTL8390_GROUP_SETTING(1, 1),
+		RTL8390_GROUP_SETTING(1, 2),
+		RTL8390_GROUP_SETTING(2, 0),
+		RTL8390_GROUP_SETTING(2, 1),
+		RTL8390_GROUP_SETTING(2, 2),
+		RTL8390_GROUP_SETTING(3, 0),
+		RTL8390_GROUP_SETTING(3, 1),
+		RTL8390_GROUP_SETTING(3, 2),
 	},
 };
 
@@ -674,6 +850,10 @@ static const struct of_device_id of_switch_port_led_match[] = {
 	{
 		.compatible = "realtek,rtl8380-port-led",
 		.data = &rtl8380_port_led_config
+	},
+	{
+		.compatible = "realtek,rtl8390-port-led",
+		.data = &rtl8390_port_led_config
 	},
 	{ /* sentinel */ }
 };
