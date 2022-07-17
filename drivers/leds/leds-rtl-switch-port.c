@@ -39,11 +39,14 @@ struct led_port_modes {
 };
 
 struct led_port_group {
+	unsigned int index;
 	struct regmap_field *setting;
 	unsigned int size;
 	/* bitmap to keep track of associated ports */
 	unsigned long *ports;
 };
+
+#define GROUP_LIST_INDEX(cfg, grp, idx)		((cfg)->port_led_count * (grp) + idx)
 
 struct switch_port_led_config;
 
@@ -84,13 +87,16 @@ struct switch_port_led_config {
 	 * group. Return group on success, or < 0 on failure.
 	 */
 	struct led_port_group *(*map_group)(struct switch_port_led *led, u32 trigger);
+	int (*assign_group)(struct switch_port_led *led, u32 group);
 	struct reg_field group_settings[];
 };
 
 static struct led_port_group *switch_port_led_get_group(
 	struct switch_port_led *pled, unsigned int group)
 {
-	return &pled->ctrl->groups[group * pled->ctrl->cfg->port_led_count + pled->index];
+	unsigned int i = GROUP_LIST_INDEX(pled->ctrl->cfg, group, pled->index);
+
+	return &pled->ctrl->groups[i];
 }
 
 /*
@@ -218,6 +224,14 @@ static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led 
 	return group;
 }
 
+int rtl8380_port_led_assign_group(struct switch_port_led *led, unsigned int group)
+{
+	if (led->port > 23)
+		return group == 1 ? 0 : -EINVAL;
+
+	return group == 0 ? 0 : -EINVAL;
+}
+
 static int rtl8380_port_led_set_port_enabled(struct switch_port_led *led, bool enabled)
 {
 	unsigned int reg = RTL8380_REG_LED_P_EN_CTRL;
@@ -277,6 +291,7 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 	.read_mode = rtl8380_port_led_read_mode,
 	.trigger_xlate = rtl8380_port_trigger_xlate,
 	.map_group = rtl8380_port_led_map_group,
+	.assign_group = rtl8380_port_led_assign_group,
 	.group_settings = {
 		RTL8380_GROUP_SETTING(0, 0),
 		RTL8380_GROUP_SETTING(0, 1),
@@ -400,7 +415,11 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 			if (err)
 				goto err_out;
 		}
-	
+
+		err = pled->ctrl->cfg->assign_group(pled, new_group->index);
+		if (err)
+			goto err_out;
+
 		bitmap_clear(group->ports, pled->port, 1);
 		bitmap_set(new_group->ports, pled->port, 1);
 		pled->current_group = new_group;
@@ -554,8 +573,9 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	struct led_port_group *group;
 	struct switch_port_led *pled;
 	u32 leds_per_port = 0;
+	int i, i_grp, i_led;
 	int child_count;
-	int err, i;
+	int err;
 
 	np = dev->of_node;
 
@@ -585,18 +605,23 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	if (!ctrl->groups)
 		return -ENOMEM;
 
-	for (i = 0; i < member_map_count; i++) {
-		group = &ctrl->groups[i];
-		group_setting = ctrl->cfg->group_settings[i];
+	for (i_grp = 0; i_grp < ctrl->cfg->group_count; i_grp++) {
+		for (i_led = 0; i_led < ctrl->cfg->port_led_count; i_led++) {
+			i = GROUP_LIST_INDEX(ctrl->cfg, i_grp, i_led);
 
-		group->size = ctrl->cfg->port_count;
-		group->setting = devm_regmap_field_alloc(dev, ctrl->map, group_setting);
-		if (!group->setting)
-			return -ENOMEM;
+			group = &ctrl->groups[i];
+			group_setting = ctrl->cfg->group_settings[i];
 
-		group->ports = devm_bitmap_zalloc(dev, ctrl->cfg->port_count, GFP_KERNEL);
-		if (!group->ports)
-			return -ENOMEM;
+			group->index = i_grp;
+			group->size = ctrl->cfg->port_count;
+			group->setting = devm_regmap_field_alloc(dev, ctrl->map, group_setting);
+			if (!group->setting)
+				return -ENOMEM;
+
+			group->ports = devm_bitmap_zalloc(dev, ctrl->cfg->port_count, GFP_KERNEL);
+			if (!group->ports)
+				return -ENOMEM;
+		}
 	}
 
 	err = devm_led_trigger_register(dev, &switch_port_rtl_hw_trigger);
