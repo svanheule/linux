@@ -165,6 +165,8 @@
 			#address-cells = <2>;
 			#size-cells = <0>;
 
+			realtek,output-mode = "serial";
+
 			led@8.0 {
 				reg = <8 0>;
 				label = "lan1";
