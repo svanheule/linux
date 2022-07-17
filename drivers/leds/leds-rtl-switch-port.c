@@ -56,7 +56,7 @@ struct led_port_group {
 	unsigned long *ports;
 };
 
-#define GROUP_LIST_INDEX(cfg, grp, idx)		((cfg)->port_led_count * (grp) + idx)
+#define GROUP_LIST_INDEX(cfg, grp, idx)		((cfg)->port_led_count * (grp) + (idx))
 
 struct switch_port_led_config;
 
