@@ -44,8 +44,8 @@ struct realtek_switchcore_ctrl {
 static void rtl8380_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 {
 	char model_char[4] = {0, 0, 0, 0};
+	u32 model_id, rl_id;
 	char chip_rev;
-	u32 model_id;
 	u32 val = 0;
 
 	regmap_read(ctrl->map, RTL8380_REG_MODEL_NAME_INFO, &val);
@@ -58,8 +58,10 @@ static void rtl8380_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 	regmap_write(ctrl->map, RTL8380_REG_CHIP_INFO, FIELD_PREP(GENMASK(31, 28), 0xa));
 	regmap_read(ctrl->map, RTL8380_REG_CHIP_INFO, &val);
 	chip_rev = MODEL_NAME_CHAR(val, 20, 16) ?: '0';
+	rl_id = FIELD_GET(GENMASK(15, 0), val);
 
-	dev_info(ctrl->dev, "found RTL%04x%s rev. %c\n", model_id, model_char, chip_rev);
+	dev_info(ctrl->dev, "found RTL%04x%s rev. %c, CPU RTL%04x\n",
+		model_id, model_char, chip_rev, rl_id);
 }
 
 #define RTL8390_REG_MODEL_NAME_INFO	0x0ff0
@@ -68,8 +70,8 @@ static void rtl8380_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 static void rtl8390_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 {
 	char model_char[3] = {0, 0, 0};
+	u32 model_id, rl_id;
 	char chip_rev;
-	u32 model_id;
 	u32 val = 0;
 
 	regmap_read(ctrl->map, RTL8390_REG_MODEL_NAME_INFO, &val);
@@ -81,8 +83,10 @@ static void rtl8390_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 	regmap_write(ctrl->map, RTL8390_REG_CHIP_INFO, FIELD_PREP(GENMASK(31, 28), 0xa));
 	regmap_read(ctrl->map, RTL8390_REG_CHIP_INFO, &val);
 	chip_rev = MODEL_NAME_CHAR(val, 20, 16) ?: '0';
+	rl_id = FIELD_GET(GENMASK(15, 0), val);
 
-	dev_info(ctrl->dev, "found RTL%04x%s rev. %c\n", model_id, model_char, chip_rev);
+	dev_info(ctrl->dev, "found RTL%04x%s rev. %c, CPU RTL%04x\n",
+		model_id, model_char, chip_rev, rl_id);
 }
 
 /*
