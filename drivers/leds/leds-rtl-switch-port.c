@@ -25,6 +25,9 @@
 #define PTRG_LINK_10		BIT(2)
 #define PTRG_LINK_100		BIT(3)
 #define PTRG_LINK_1000		BIT(4)
+#define PTRG_LINK_2500		BIT(5)
+#define PTRG_LINK_5000		BIT(6)
+#define PTRG_LINK_10000		BIT(7)
 
 struct led_port_blink_mode {
 	u16 interval; /* Toggle interval in ms */
@@ -125,6 +128,7 @@ enum rtl83xx_port_trigger {
 	RTL83XX_TRIG_ACT = 2,
 	RTL83XX_TRIG_ACT_RX = 3,
 	RTL83XX_TRIG_ACT_TX = 4,
+	RTL83XX_TRIG_DUPLEX_MODE = 6,
 	RTL83XX_TRIG_LINK_1G = 7,
 	RTL83XX_TRIG_LINK_100M = 8,
 	RTL83XX_TRIG_LINK_10M = 9,
@@ -134,6 +138,7 @@ enum rtl83xx_port_trigger {
 	RTL83XX_TRIG_LINK_ACT_1G_100M = 13,
 	RTL83XX_TRIG_LINK_ACT_1G_10M = 14,
 	RTL83XX_TRIG_LINK_ACT_100M_10M = 15,
+	RTL83XX_TRIG_LINK_ACT_10G = 21,
 	RTL83XX_TRIG_DISABLED = 31,
 };
 
