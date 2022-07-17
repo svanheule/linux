@@ -18,6 +18,13 @@
  * matching conditions. Alternatively, each individual LED output can also be
  * configured for manual control.
  */
+enum rtl_led_output_mode {
+	RTL_LED_OUTPUT_SERIAL = 0,
+	RTL_LED_OUTPUT_SCAN_SINGLE = 1,
+	RTL_LED_OUTPUT_SCAN_BICOLOR = 2,
+	RTL_LED_OUTPUT_DISABLED = 3,
+};
+
 #define PTRG_NONE		0
 #define PTRG_ACT_RX		BIT(0)
 #define PTRG_ACT_TX		BIT(1)
@@ -77,7 +84,7 @@ struct switch_port_led_config {
 	const struct led_port_modes *modes;
 	/* Set the number of LEDs per port */
 	int (*port_led_init)(struct switch_port_led_ctrl *ctrl,
-		unsigned int led_count);
+		unsigned int led_count, enum rtl_led_output_mode mode);
 	/* Enable or disable all LEDs for a certain port */
 	int (*set_port_enabled)(struct switch_port_led *led, bool enabled);
 	int (*set_hw_managed)(struct switch_port_led *led, bool hw_managed);
@@ -302,11 +309,18 @@ static int rtl8380_port_led_read_mode(struct switch_port_led *led)
 	return (val >> (3 * led->index)) & GENMASK(2, 0);
 }
 
-static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, unsigned int led_count)
+static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl,
+	unsigned int led_count, enum rtl_led_output_mode mode)
 {
-	u32 led_count_mask = GENMASK(led_count - 1, 0);
-	u32 led_mask = GENMASK(5, 0);
+	u32 led_count_mask, led_mask;
+	int err;
 
+	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_MODE_SEL, GENMASK(1, 0), mode);
+	if (err)
+		return err;
+
+	led_count_mask = GENMASK(led_count - 1, 0);
+	led_mask = GENMASK(5, 0);
 	return regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, led_mask,
 			(led_count_mask << 3) | led_count_mask);
 }
@@ -444,14 +458,17 @@ static int rtl8390_port_led_read_mode(struct switch_port_led *led)
 	return (val >> shift) & GENMASK(2, 0);
 }
 
-static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, unsigned int led_count)
+static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl,
+	unsigned int led_count, enum rtl_led_output_mode mode)
 {
 	u32 count_mask = GENMASK(3, 2);
+	u32 mode_mask = GENMASK(1, 0);
+	u32 enable = BIT(5);
 	u32 count_val = FIELD_PREP(count_mask, led_count);
-	u32 enable = GENMASK(5, 5);
+	u32 mode_val = FIELD_PREP(mode_mask, mode);
 
 	return regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL,
-		count_mask | enable, count_val | enable);
+		count_mask | enable | mode_mask, count_val | enable | mode_val);
 }
 
 static const struct switch_port_led_config rtl8390_port_led_config = {
@@ -751,8 +768,10 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	struct device_node *np, *child;
 	struct reg_field group_setting;
 	unsigned int member_map_count;
+	enum rtl_led_output_mode mode;
 	struct led_port_group *group;
 	struct switch_port_led *pled;
+	const char *mode_name;
 	u32 leds_per_port = 0;
 	int i, i_grp, i_led;
 	int child_count;
@@ -815,6 +834,19 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	if (!child_count)
 		return 0;
 
+	err = fwnode_property_read_string(dev_fwnode(dev), "realtek,output-mode", &mode_name);
+	if (err)
+		return dev_err_probe(dev, err, "failed to read realtek,output-mode\n");
+
+	if (strcmp(mode_name, "serial") == 0)
+		mode = RTL_LED_OUTPUT_SERIAL;
+	else if (strcmp(mode_name, "single-color-scan") == 0)
+		mode = RTL_LED_OUTPUT_SCAN_SINGLE;
+	else if (strcmp(mode_name, "bi-color-scan") == 0)
+		mode = RTL_LED_OUTPUT_SCAN_BICOLOR;
+	else
+		return dev_err_probe(dev, -EINVAL, "realtek,output-mode invalid\n");
+
 	for_each_available_child_of_node(np, child) {
 		if (of_n_addr_cells(child) != 2 || of_n_size_cells(child) != 0) {
 			dev_err(dev, "#address-cells (%d) is not 2 or #size-cells (%d) is not 0\n",
@@ -843,7 +875,7 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 				leds_per_port, ctrl->cfg->port_led_count);
 	}
 
-	return ctrl->cfg->port_led_init(ctrl, leds_per_port);
+	return ctrl->cfg->port_led_init(ctrl, leds_per_port, mode);
 }
 
 static const struct of_device_id of_switch_port_led_match[] = {
