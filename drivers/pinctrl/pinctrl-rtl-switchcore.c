@@ -185,9 +185,76 @@ static const struct rtl_swcore_config rtl8380_config = {
  * 676 for pins with unknowns positions. When actual pin positions are found
  * (if ever), these can the be mapped to their real values.
  */
-#define RTL8390_VPIN(num, name)		PINCTRL_PIN(26 * 26 + (num), (name))
+#define RTL8390_VPIN(num)		(26 * 26 + (num))
 
-/* TODO RTL8390 */
+static const struct pinctrl_pin_desc rtl8390_swcore_pins[] = {
+	/* sys-led, or gpio0 */
+	PINCTRL_PIN(RTL8390_VPIN(0), "sys-led"),
+	/* aux mdio clock, or gpio2 */
+	PINCTRL_PIN(RTL8390_VPIN(2), "aux-mdc"),
+	/* aux mdio data, or gpio3 */
+	PINCTRL_PIN(RTL8390_VPIN(3), "aux-mdio"),
+	/* JTAG tck, UART1 cts, or gpio4 */
+	PINCTRL_PIN(RTL8390_VPIN(4), "tck"),
+	/* JTAG tdi, UART1 rx (?), or gpio6 */
+	PINCTRL_PIN(RTL8390_VPIN(6), "tdi"),
+	/* JTAG tdo, UART1 tx (?), or gpio7 */
+	PINCTRL_PIN(RTL8390_VPIN(7), "tdo"),
+};
+
+static const unsigned int rtl8390_jtag_pins[] = {
+	RTL8390_VPIN(4), RTL8390_VPIN(5), RTL8390_VPIN(6), RTL8390_VPIN(7)
+};
+static const unsigned int rtl8390_aux_mdio_pins[] = {
+	RTL8390_VPIN(2), RTL8390_VPIN(3)
+};
+static const unsigned int rtl8390_sys_led_pins[] = {RTL8390_VPIN(0)};
+
+static const struct rtl_swcore_mux_desc rtl8390_mux_jtag =
+	SWITCHCORE_MUX("jtag", REG_FIELD(0x000a, 0, 1), rtl8390_jtag_pins);
+
+static const struct rtl_swcore_mux_desc rtl8390_mux_aux_mdio =
+	SWITCHCORE_MUX("aux-mdio", REG_FIELD(0x00e4, 18, 20), rtl8390_aux_mdio_pins);
+
+static const struct rtl_swcore_mux_desc rtl8390_mux_sys_led =
+	SWITCHCORE_MUX("sys-led", REG_FIELD(0x00e4, 14, 14), rtl8390_sys_led_pins);
+
+static const struct rtl_swcore_mux_desc *rtl8390_groups[] = {
+	&rtl8390_mux_jtag,
+	&rtl8390_mux_aux_mdio,
+	&rtl8390_mux_sys_led,
+};
+
+static const struct rtl_swcore_mux_setting rtl8390_gpio_settings[] = {
+	{&rtl8390_mux_jtag, 2},
+	{&rtl8390_mux_aux_mdio, 0},
+	{&rtl8390_mux_sys_led, 0},
+};
+static const struct rtl_swcore_mux_setting rtl8390_aux_mdio_settings[] = {
+	{&rtl8390_mux_aux_mdio, 4},
+};
+static const struct rtl_swcore_mux_setting rtl8390_sys_led_settings[] = {
+	{&rtl8390_mux_sys_led, 1},
+};
+static const struct rtl_swcore_mux_setting rtl8390_uart1_settings[] = {
+	{&rtl8390_mux_jtag, 1},
+};
+
+static const struct rtl_swcore_function_desc rtl8390_functions[] = {
+	SWITCHCORE_FUNCTION("gpio", rtl8390_gpio_settings),
+	SWITCHCORE_FUNCTION("aux-mdio", rtl8390_aux_mdio_settings),
+	SWITCHCORE_FUNCTION("sys-led", rtl8390_sys_led_settings),
+	SWITCHCORE_FUNCTION("uart1", rtl8390_uart1_settings),
+};
+
+static const struct rtl_swcore_config rtl8390_config = {
+	.pins = rtl8390_swcore_pins,
+	.npins = ARRAY_SIZE(rtl8390_swcore_pins),
+	.functions = rtl8390_functions,
+	.nfunctions = ARRAY_SIZE(rtl8390_functions),
+	.groups = rtl8390_groups,
+	.ngroups = ARRAY_SIZE(rtl8390_groups),
+};
 
 /* TODO RTL9300 */
 
@@ -294,6 +361,10 @@ static const struct of_device_id of_rtl_swcore_pinctrl_match[] = {
 	{
 		.compatible = "realtek,rtl8380-pinctrl",
 		.data = &rtl8380_config,
+	},
+	{
+		.compatible = "realtek,rtl8390-pinctrl",
+		.data = &rtl8390_config,
 	},
 	{ /* sentinel */ }
 };
