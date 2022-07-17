@@ -425,7 +425,6 @@ static int rtl8390_port_led_set_hw_managed(struct switch_port_led *led, bool hw_
 	u32 field_mask = BIT(3 * (led->port % 10) + led->index);
 	u32 val = hw_managed ? 0 : field_mask;
 
-	/* TODO requires commiting settings? */
 	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
 }
 
@@ -774,12 +773,9 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	const char *mode_name;
 	u32 leds_per_port = 0;
 	int i, i_grp, i_led;
-	int child_count;
 	int err;
 
 	np = dev->of_node;
-
-	dev_info(dev, "probing port leds\n");
 
 //	if (!pdev->mfd_cell)
 //		return dev_err_probe(dev, -ENODEV, "must be instantiated as MFD child\n");
@@ -828,12 +824,6 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	if (err)
 		return dev_err_probe(dev, err, "failed to register private trigger");
 
-	child_count = of_get_child_count(np);
-	dev_info(dev, "%d child nodes\n", child_count);
-
-	if (!child_count)
-		return 0;
-
 	err = fwnode_property_read_string(dev_fwnode(dev), "realtek,output-mode", &mode_name);
 	if (err)
 		return dev_err_probe(dev, err, "failed to read realtek,output-mode\n");
@@ -849,10 +839,10 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 
 	for_each_available_child_of_node(np, child) {
 		if (of_n_addr_cells(child) != 2 || of_n_size_cells(child) != 0) {
-			dev_err(dev, "#address-cells (%d) is not 2 or #size-cells (%d) is not 0\n",
-				(u32) of_n_addr_cells(child), (u32) of_n_size_cells(child));
 			of_node_put(child);
-			return -EINVAL;
+			return dev_err_probe(dev, -EINVAL,
+				"#address-cells (%d) is not 2 or #size-cells (%d) is not 0\n",
+				(u32) of_n_addr_cells(child), (u32) of_n_size_cells(child));
 		}
 
 		if (!of_node_name_prefix(child, "led")) {
@@ -869,10 +859,12 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 		if (pled->index + 1 > leds_per_port)
 			leds_per_port = pled->index + 1;
 
-		if (leds_per_port > ctrl->cfg->port_led_count)
+		if (leds_per_port > ctrl->cfg->port_led_count) {
+			of_node_put(child);
 			return dev_err_probe(dev, -EINVAL,
 				"too many LEDs per port: %d > %d\n",
 				leds_per_port, ctrl->cfg->port_led_count);
+		}
 	}
 
 	return ctrl->cfg->port_led_init(ctrl, leds_per_port, mode);
