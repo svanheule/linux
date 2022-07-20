@@ -15,7 +15,7 @@
 
 	chosen {
 		stdout-path = "serial0";
-		bootargs = "earlycon console=ttyS0,115200";
+		bootargs = "earlycon console=ttyS0,9600";
 	};
 
 	aliases {
@@ -46,8 +46,8 @@
 	};
 
 	mdio1: mdio {
-		pinctrl-names = "default";
-		pinctrl-0 = <&gpio_mdx_pins>;
+//		pinctrl-names = "default";
+//		pinctrl-0 = <&gpio_mdx_pins>;
 
 		compatible = "virtual,mdio-gpio";
 		#address-cells = <1>;
@@ -150,40 +150,45 @@
 //		los-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
 //	};
 
-	switchcore@1b000000 {
-		compatible = "syscon", "simple-mfd";
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0x0 0x1b000000 0x20000>;
-
-		pinctrl_sysled: pinmux@a000 {
-			compatible = "pinctrl-single";
-			reg = <0xa000 0x4>;
-
-			pinctrl-single,bit-per-mux;
-			pinctrl-single,register-width = <32>;
-			pinctrl-single,function-mask = <0x1>;
-			#pinctrl-cells = <2>;
-
-			sys_led_pins: pinmux_sys_led_pins {
-				pinctrl-single,bits = <0x0 0x0000 0x8000>;
-			};
-		};
-
-		pinctrl_gpio: pinmux@a0e0 {
-			compatible = "pinctrl-single";
-			reg = <0xa0e0 0x4>;
-
-			pinctrl-single,bit-per-mux;
-			pinctrl-single,register-width = <32>;
-			pinctrl-single,function-mask = <0x1>;
-			#pinctrl-cells = <2>;
-
-			gpio_mdx_pins: pinmux_gpio_mdx_pins {
-				pinctrl-single,bits = <0x0 0x0 0x1>;
-			};
-		};
+	switchcore-bus@1b000000 {
+		compatible = "realtek,rtl8380-switchcore", "syscon";
+		reg = <0x1b000000 0x10000>;
 	};
+
+//	switchcore@1b000000 {
+//		compatible = "syscon", "simple-mfd";
+//		#address-cells = <1>;
+//		#size-cells = <1>;
+//		ranges = <0x0 0x1b000000 0x20000>;
+//
+//		pinctrl_sysled: pinmux@a000 {
+//			compatible = "pinctrl-single";
+//			reg = <0xa000 0x4>;
+//
+//			pinctrl-single,bit-per-mux;
+//			pinctrl-single,register-width = <32>;
+//			pinctrl-single,function-mask = <0x1>;
+//			#pinctrl-cells = <2>;
+//
+//			sys_led_pins: pinmux_sys_led_pins {
+//				pinctrl-single,bits = <0x0 0x0000 0x8000>;
+//			};
+//		};
+//
+//		pinctrl_gpio: pinmux@a0e0 {
+//			compatible = "pinctrl-single";
+//			reg = <0xa0e0 0x4>;
+//
+//			pinctrl-single,bit-per-mux;
+//			pinctrl-single,register-width = <32>;
+//			pinctrl-single,function-mask = <0x1>;
+//			#pinctrl-cells = <2>;
+//
+//			gpio_mdx_pins: pinmux_gpio_mdx_pins {
+//				pinctrl-single,bits = <0x0 0x0 0x1>;
+//			};
+//		};
+//	};
 };
 
 &serial0 {
