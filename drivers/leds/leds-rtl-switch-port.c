@@ -86,8 +86,8 @@ struct switch_port_led_config {
 	unsigned int group_count;
 	const struct led_port_modes *modes;
 	/* Set the number of LEDs per port */
-	int (*port_led_init)(struct switch_port_led_ctrl *ctrl,
-		unsigned int led_count, enum rtl_led_output_mode mode);
+	int (*port_led_init)(struct switch_port_led_ctrl *ctrl, unsigned int led_count,
+		enum rtl_led_output_mode mode);
 	/* Enable or disable all LEDs for a certain port */
 	int (*set_port_enabled)(struct switch_port_led *led, bool enabled);
 	int (*set_hw_managed)(struct switch_port_led *led, bool hw_managed);
@@ -100,7 +100,8 @@ struct switch_port_led_config {
 	 * group. Return group on success, or < 0 on failure.
 	 */
 	struct led_port_group *(*map_group)(struct switch_port_led *led, u32 trigger);
-	int (*assign_group)(struct switch_port_led *led, u32 group);
+	int (*assign_group)(struct switch_port_led *led, struct led_port_group *group,
+		u32 port_types);
 	struct reg_field group_settings[];
 };
 
@@ -115,7 +116,7 @@ static struct led_port_group *switch_port_led_get_group(
 static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_led *led, u32 trigger)
 {
 	struct switch_port_led_ctrl *ctrl = led->ctrl;
-	int rtl_trg = ctrl->cfg->trigger_xlate(pled, trigger);
+	int rtl_trg = ctrl->cfg->trigger_xlate(led, trigger);
 	struct led_port_group *group;
 	u32 current_trg;
 	unsigned int i;
@@ -190,7 +191,7 @@ static const struct led_port_modes rtl8380_port_led_modes = {
 		   {1024, 7}}
 };
 
-static int rtl83xx_port_trigger_xlate(u32 port_trigger_led)
+static int rtl83xx_port_trigger_xlate(u32 port_led_trigger)
 {
 	switch (port_led_trigger & ~PTRG_PORT) {
 	case PTRG_NONE:
@@ -232,10 +233,10 @@ static int rtl83xx_port_trigger_xlate(u32 port_trigger_led)
 
 static int rtl8380_port_trigger_xlate(struct switch_port_led *led, u32 port_led_trigger)
 {
-	if (led->port < 20 && (trigger & PTRG_PORT_SFP))
+	if (led->port < 20 && (port_led_trigger & PTRG_PORT_SFP))
 		return -EINVAL;
 
-	if (trigger & (PTRG_LINK_2500 | PTRG_LINK_5000 | PTRG_LINK_10000))
+	if (port_led_trigger & (PTRG_LINK_2500 | PTRG_LINK_5000 | PTRG_LINK_10000))
 		return -EINVAL;
 
 	return rtl83xx_port_trigger_xlate(port_led_trigger);
@@ -252,7 +253,7 @@ static int rtl8380_port_trigger_xlate(struct switch_port_led *led, u32 port_led_
  */
 static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led *led, u32 trigger)
 {
-	int rtl_trigger = rtl8380_port_trigger_xlate(pled, trigger);
+	int rtl_trigger = rtl8380_port_trigger_xlate(led, trigger);
 	struct switch_port_led_ctrl *ctrl = led->ctrl;
 	struct led_port_group *group;
 	u32 current_trigger;
@@ -279,12 +280,45 @@ static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led 
 	return group;
 }
 
-int rtl8380_port_led_assign_group(struct switch_port_led *led, unsigned int group)
+int rtl8380_port_led_assign_group(struct switch_port_led *led,
+	struct led_port_group *group, u32 port_types)
 {
-	if (led->port > 23)
-		return group == 1 ? 0 : -EINVAL;
+	/* FIXME Use macro for port count */
+	DECLARE_BITMAP(illegal_combo_ports, 28);
+	u32 combo_port_mask = GENMASK(8, 7);
+	struct led_port_group *other_group;
+	u32 combo_port_new;
+	u32 combo_port_old;
+	u32 val = 0;
 
-	return group == 0 ? 0 : -EINVAL;
+	/* Doesn't match static groups */
+	if ((led->port < 24 && group->index == 1) || (led->port >= 24 && group->index == 0))
+		return -EINVAL;
+
+	/* No combo port, no problem */
+	if ((port_types & PTRG_PORT) != (PTRG_PORT_COPPER | PTRG_PORT_SFP))
+		return 0;
+
+	if (led->port < 24) {
+		combo_port_new = 1;
+		other_group = switch_port_led_get_group(led, 1);
+		bitmap_set(illegal_combo_ports, 24, 4);
+	} else {
+		combo_port_new = 2;
+		other_group = switch_port_led_get_group(led, 0);
+		bitmap_set(illegal_combo_ports, 20, 4);
+	}
+
+	regmap_read(led->ctrl->map, RTL8380_REG_LED_GLB_CTRL, &val);
+	combo_port_old = FIELD_GET(combo_port_mask, val);
+
+	/* Can't change the setting until the other group is empty */
+	if (combo_port_old != combo_port_new
+		&& bitmap_intersects(other_group->ports, illegal_combo_ports, 28))
+		return -EBUSY;
+
+	return regmap_update_bits(led->ctrl->map, RTL8380_REG_LED_GLB_CTRL,
+		combo_port_mask, combo_port_new);
 }
 
 static int rtl8380_port_led_set_port_enabled(struct switch_port_led *led, bool enabled)
@@ -369,7 +403,10 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
  */
 #define RTL8390_REG_LED_GLB_CTRL		0x00e4
 #define RTL8390_REG_LED_COPR_SET_SEL_CTRL(led)	(0x00f0 + 4 * ((led)->port / 16))
+#define RTL8390_REG_LED_FIB_SET_SEL_CTRL(led)	(0x0100 + 4 * ((led)->port / 16))
 #define RTL8390_REG_LED_COPR_PMASK_CTRL(led)	(0x0110 + 4 * ((led)->port / 32))
+#define RTL8390_REG_LED_FIB_PMASK_CTRL(led)	(0x0118 + 4 * ((led)->port / 32))
+#define RTL8390_REG_LED_COMBO_CTRL(led)		(0x0120 + 4 * ((led)->port / 32))
 #define RTL8390_REG_LED_SW_CTRL			0x0128
 #define RTL8390_REG_LED_SW_P_EN_CTRL(led)	(0x012c + 4 * ((led)->port / 10))
 #define RTL8390_REG_LED_SW_P_CTRL(led)		(0x0144 + 4 * (led)->port)
@@ -413,14 +450,37 @@ static int rtl8390_port_trigger_xlate(struct switch_port_led *led, u32 port_led_
 	return rtl83xx_port_trigger_xlate(port_led_trigger);
 }
 
-int rtl8390_port_led_assign_group(struct switch_port_led *led, unsigned int group)
+int rtl8390_port_led_assign_group(struct switch_port_led *led,
+	struct led_port_group *group, u32 port_type)
 {
-	unsigned int reg = RTL8390_REG_LED_COPR_SET_SEL_CTRL(led);
+	unsigned int reg_set_copper = RTL8390_REG_LED_COPR_SET_SEL_CTRL(led);
+	unsigned int reg_mask_copper = RTL8390_REG_LED_COPR_PMASK_CTRL(led);
+	unsigned int reg_set_sfp = RTL8390_REG_LED_FIB_SET_SEL_CTRL(led);
+	unsigned int reg_mask_sfp = RTL8390_REG_LED_FIB_PMASK_CTRL(led);
 	unsigned int shift = 2 * (led->port % 16);
+	u32 pmask = BIT(led->port % 32);
 	u32 mask = GENMASK(1, 0) << shift;
-	u32 val = group << shift;
+	u32 val = group->index << shift;
 
-	return regmap_update_bits(led->ctrl->map, reg, mask, val);
+	// TODO Need to assign COPPER, first group to SW-only LED
+	if (port_type & PTRG_PORT_COPPER) {
+		regmap_update_bits(led->ctrl->map, reg_set_copper, mask, val);
+		regmap_update_bits(led->ctrl->map, reg_mask_copper, pmask, 1);
+	} else
+		regmap_update_bits(led->ctrl->map, reg_mask_copper, pmask, 0);
+
+	if (port_type & PTRG_PORT_SFP) {
+		regmap_update_bits(led->ctrl->map, reg_set_sfp, mask, val);
+		regmap_update_bits(led->ctrl->map, reg_mask_sfp, pmask, 1);
+	} else
+		regmap_update_bits(led->ctrl->map, reg_mask_sfp, pmask, 0);
+
+	if ((port_type & PTRG_PORT) == (PTRG_PORT_COPPER | PTRG_PORT_SFP))
+		regmap_update_bits(led->ctrl->map, RTL8390_REG_LED_COMBO_CTRL(led), pmask, 1);
+	else
+		regmap_update_bits(led->ctrl->map, RTL8390_REG_LED_COMBO_CTRL(led), pmask, 0);
+
+	return 0;
 }
 
 static int rtl8390_port_led_set_port_enabled(struct switch_port_led *led, bool enabled)
@@ -429,6 +489,9 @@ static int rtl8390_port_led_set_port_enabled(struct switch_port_led *led, bool e
 	int reg = RTL8390_REG_LED_COPR_PMASK_CTRL(led);
 	u32 field_mask = BIT(led->port % 32);
 	u32 val = enabled ? field_mask : 0;
+
+	// TODO just use ... ?
+	// return rtl8390_port_led_assign_group(led, 0, enabled ? PTRG_PORT_COPPER : 0);
 
 	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
 }
@@ -626,7 +689,7 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 				goto err_out;
 		}
 
-		err = pled->ctrl->cfg->assign_group(pled, new_group->index);
+		err = pled->ctrl->cfg->assign_group(pled, new_group, value & PTRG_PORT);
 		if (err)
 			goto err_out;
 
