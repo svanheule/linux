@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <linux/bitfield.h>
 #include <linux/leds.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/syscon.h>
@@ -28,6 +29,9 @@ struct realtek_switchcore_ctrl {
 	bool active_low;
 };
 
+#define MODEL_NAME_CHAR_XLATE(val)		((val) ? 'A' + (val) - 1 : '\0')
+#define MODEL_NAME_CHAR(reg, msb, lsb)		(MODEL_NAME_CHAR_XLATE(FIELD_GET(GENMASK((msb), (lsb)), (val))))
+
 /*
  * Model name probe
  *
@@ -36,8 +40,6 @@ struct realtek_switchcore_ctrl {
  */
 #define RTL8380_REG_MODEL_NAME_INFO		0x00d4
 #define RTL8380_REG_CHIP_INFO			0x00d8
-#define MODEL_NAME_CHAR_XLATE(val)		((val) ? 'A' + (val) - 1 : '\0')
-#define MODEL_NAME_CHAR(reg, msb, lsb)		(MODEL_NAME_CHAR_XLATE(FIELD_GET(GENMASK((msb), (lsb)), (val))))
 
 #define RTL8380_REG_INT_RW_CTRL			0x0058
 
