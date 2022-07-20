@@ -26,15 +26,18 @@ enum rtl_led_output_mode {
 };
 
 #define PTRG_NONE		0
-#define PTRG_ACT_RX		BIT(0)
-#define PTRG_ACT_TX		BIT(1)
-#define PTRG_ACT		PTRG_ACT_RX | PTRG_ACT_TX
-#define PTRG_LINK_10		BIT(2)
-#define PTRG_LINK_100		BIT(3)
-#define PTRG_LINK_1000		BIT(4)
-#define PTRG_LINK_2500		BIT(5)
-#define PTRG_LINK_5000		BIT(6)
-#define PTRG_LINK_10000		BIT(7)
+#define PTRG_PORT_COPPER	BIT(0)
+#define PTRG_PORT_SFP		BIT(1)
+#define PTRG_PORT		(PTRG_PORT_COPPER | PTRG_PORT_SFP)
+#define PTRG_ACT_RX		BIT(2)
+#define PTRG_ACT_TX		BIT(3)
+#define PTRG_ACT		(PTRG_ACT_RX | PTRG_ACT_TX)
+#define PTRG_LINK_10		BIT(4)
+#define PTRG_LINK_100		BIT(5)
+#define PTRG_LINK_1000		BIT(6)
+#define PTRG_LINK_2500		BIT(7)
+#define PTRG_LINK_5000		BIT(8)
+#define PTRG_LINK_10000		BIT(9)
 
 struct led_port_blink_mode {
 	u16 interval; /* Toggle interval in ms */
