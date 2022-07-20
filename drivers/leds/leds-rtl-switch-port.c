@@ -93,7 +93,7 @@ struct switch_port_led_config {
 	int (*set_hw_managed)(struct switch_port_led *led, bool hw_managed);
 	int (*write_mode)(struct switch_port_led *led, unsigned int mode);
 	int (*read_mode)(struct switch_port_led *led);
-	int (*trigger_xlate)(u32 trigger);
+	int (*trigger_xlate)(struct switch_port_led *led, u32 trigger);
 	/*
 	 * Find the group the LED with this trigger setting can be assigned to.
 	 * Can be either an existing group with identical settings, or an empty
@@ -115,7 +115,7 @@ static struct led_port_group *switch_port_led_get_group(
 static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_led *led, u32 trigger)
 {
 	struct switch_port_led_ctrl *ctrl = led->ctrl;
-	int rtl_trg = ctrl->cfg->trigger_xlate(trigger);
+	int rtl_trg = ctrl->cfg->trigger_xlate(pled, trigger);
 	struct led_port_group *group;
 	u32 current_trg;
 	unsigned int i;
@@ -190,9 +190,9 @@ static const struct led_port_modes rtl8380_port_led_modes = {
 		   {1024, 7}}
 };
 
-static int rtl8380_port_trigger_xlate(u32 port_led_trigger)
+static int rtl83xx_port_trigger_xlate(u32 port_trigger_led)
 {
-	switch (port_led_trigger) {
+	switch (port_led_trigger & ~PTRG_PORT) {
 	case PTRG_NONE:
 		return RTL83XX_TRIG_DISABLED;
 	case PTRG_ACT_RX:
@@ -217,6 +217,8 @@ static int rtl8380_port_trigger_xlate(u32 port_led_trigger)
 		return RTL83XX_TRIG_LINK_ACT_100M;
 	case PTRG_ACT | PTRG_LINK_1000:
 		return RTL83XX_TRIG_LINK_ACT_1G;
+	case PTRG_ACT | PTRG_LINK_10000:
+		return RTL83XX_TRIG_LINK_ACT_10G;
 	case PTRG_ACT | PTRG_LINK_10 | PTRG_LINK_100:
 		return RTL83XX_TRIG_LINK_ACT_100M_10M;
 	case PTRG_ACT | PTRG_LINK_10 | PTRG_LINK_1000:
@@ -226,6 +228,17 @@ static int rtl8380_port_trigger_xlate(u32 port_led_trigger)
 	default:
 		return -EINVAL;
 	}
+}
+
+static int rtl8380_port_trigger_xlate(struct switch_port_led *led, u32 port_led_trigger)
+{
+	if (led->port < 20 && (trigger & PTRG_PORT_SFP))
+		return -EINVAL;
+
+	if (trigger & (PTRG_LINK_2500 | PTRG_LINK_5000 | PTRG_LINK_10000))
+		return -EINVAL;
+
+	return rtl83xx_port_trigger_xlate(port_led_trigger);
 }
 
 /*
@@ -239,7 +252,7 @@ static int rtl8380_port_trigger_xlate(u32 port_led_trigger)
  */
 static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led *led, u32 trigger)
 {
-	int rtl_trigger = rtl8380_port_trigger_xlate(trigger);
+	int rtl_trigger = rtl8380_port_trigger_xlate(pled, trigger);
 	struct switch_port_led_ctrl *ctrl = led->ctrl;
 	struct led_port_group *group;
 	u32 current_trigger;
@@ -392,14 +405,12 @@ static void rtl8390_port_commit(struct switch_port_led_ctrl *ctrl)
 	regmap_write(ctrl->map, RTL8390_REG_LED_SW_CTRL, 1);
 }
 
-static int rtl8390_port_trigger_xlate(u32 port_led_trigger)
+static int rtl8390_port_trigger_xlate(struct switch_port_led *led, u32 port_led_trigger)
 {
-	switch (port_led_trigger) {
-	case PTRG_ACT | PTRG_LINK_10000:
-		return RTL83XX_TRIG_LINK_ACT_10G;
-	default:
-		return rtl8380_port_trigger_xlate(port_led_trigger);
-	}
+	if (port_led_trigger & (PTRG_LINK_2500 | PTRG_LINK_5000))
+		return -EINVAL;
+
+	return rtl83xx_port_trigger_xlate(port_led_trigger);
 }
 
 int rtl8390_port_led_assign_group(struct switch_port_led *led, unsigned int group)
@@ -578,6 +589,10 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 	if (sscanf(buf, "%x%n", &value, &nchars) != 1 || nchars + 1 < count)
 		return -EINVAL;
 
+	trigger = pled->ctrl->cfg->trigger_xlate(pled, value);
+	if (trigger < 0)
+		return trigger;
+
 	mutex_lock(&pled->ctrl->lock);
 
 	/*
@@ -587,12 +602,6 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 	 */
 	if (pled->current_group) {
 		group = pled->current_group;
-
-		trigger = pled->ctrl->cfg->trigger_xlate(value);
-		if (trigger < 0) {
-			err = trigger;
-			goto err_out;
-		}
 
 		member_count = bitmap_weight(group->ports, group->size);
 
@@ -653,7 +662,7 @@ static int switch_port_led_trigger_activate(struct led_classdev *led_cdev)
 
 	mutex_lock(&pled->ctrl->lock);
 
-	rtl_trigger = pled->ctrl->cfg->trigger_xlate(pled->trigger_flags);
+	rtl_trigger = pled->ctrl->cfg->trigger_xlate(pled, pled->trigger_flags);
 	if (rtl_trigger < 0) {
 		err = rtl_trigger;
 		goto out;
