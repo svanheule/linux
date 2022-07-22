@@ -68,6 +68,8 @@ struct switch_port_led_ctrl {
 	struct regmap *map;
 	const struct switch_port_led_config *cfg;
 	struct mutex lock;
+	unsigned long *ports_copper;
+	unsigned long *ports_sfp;
 	struct led_port_group *groups;
 };
 
@@ -665,6 +667,7 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 	 *   - or join a new group if one is available
 	 */
 	if (pled->current_group) {
+		/* TODO Factor out the common (de)activation parts */
 		group = pled->current_group;
 
 		member_count = bitmap_weight(group->ports, group->size);
@@ -689,12 +692,16 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 				goto err_out;
 		}
 
-		err = pled->ctrl->cfg->assign_group(pled, new_group, value & PTRG_PORT);
+		err = ctrl->cfg->assign_group(pled, new_group, value & PTRG_PORT);
 		if (err)
 			goto err_out;
 
 		bitmap_clear(group->ports, pled->port, 1);
 		bitmap_set(new_group->ports, pled->port, 1);
+		if (trigger & TRG_PORT_COPPER)
+			bitmap_set(ctrl->ports_copper, pled->port, 1);
+		if (trigger & TRG_PORT_SFP)
+			bitmap_set(ctrl->ports_sfp, pled->port, 1);
 		pled->current_group = new_group;
 	}
 
@@ -875,6 +882,11 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	ctrl->groups = devm_kcalloc(dev, member_map_count,
 		sizeof(*ctrl->groups), GFP_KERNEL);
 	if (!ctrl->groups)
+		return -ENOMEM;
+
+	ctrl->ports_copper = devm_bitmap_zalloc(dev, ctrl->cfg->port_count, GFP_KERNEL);
+	ctrl->ports_sfp = devm_bitmap_zalloc(dev, ctrl->cfg->port_count, GFP_KERNEL);
+	if (!ctrl->ports_copper || !ctrl->ports_sfp)
 		return -ENOMEM;
 
 	for (i_grp = 0; i_grp < ctrl->cfg->group_count; i_grp++) {
