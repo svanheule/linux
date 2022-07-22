@@ -579,6 +579,7 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 		const char *buf, size_t count)
 {
 	struct switch_port_led *pled = dev_get_drvdata(dev);
+	struct switch_port_led_ctrl *ctrl = pled->ctrl;
 	struct led_port_group *group, *new_group;
 	unsigned int member_count;
 	int trigger;
@@ -589,11 +590,11 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 	if (sscanf(buf, "%x%n", &value, &nchars) != 1 || nchars + 1 < count)
 		return -EINVAL;
 
-	trigger = pled->ctrl->cfg->trigger_xlate(pled, value);
+	trigger = ctrl->cfg->trigger_xlate(pled, value);
 	if (trigger < 0)
 		return trigger;
 
-	mutex_lock(&pled->ctrl->lock);
+	mutex_lock(&ctrl->lock);
 
 	/*
 	 * If the private trigger is already active:
@@ -613,7 +614,7 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 			goto out;
 		}
 
-		new_group = pled->ctrl->cfg->map_group(pled, value);
+		new_group = ctrl->cfg->map_group(pled, value);
 		if (IS_ERR(new_group)) {
 			err = PTR_ERR(new_group);
 			goto err_out;
@@ -638,7 +639,7 @@ out:
 	pled->trigger_flags = value;
 
 err_out:
-	mutex_unlock(&pled->ctrl->lock);
+	mutex_unlock(&ctrl->lock);
 
 	if (err)
 		return err;
