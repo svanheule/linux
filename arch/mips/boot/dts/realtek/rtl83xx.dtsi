@@ -28,6 +28,14 @@
 		#size-cells = <1>;
 		ranges = <0x0 0x18000000 0x10000>;
 
+		spi0: spi@1200 {
+			compatible = "realtek,rtl8380-spi";
+			reg = <0x1200 0x100>;
+		
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
 		serial0: serial@2000 {
 			compatible = "ns16550a";
 			reg = <0x2000 0x100>;
