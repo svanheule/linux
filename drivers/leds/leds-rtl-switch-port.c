@@ -89,7 +89,7 @@ struct switch_port_led_config {
 	/*
 	 * Find the group the LED with this trigger setting can be assigned to.
 	 * Can be either an existing group with identical settings, or an empty
-	 * group. Return group on success, or < 0 on failure.
+	 * group. Return a group on success, or < 0 on failure.
 	 */
 	struct led_port_group *(*map_group)(struct switch_port_led *led, u32 trigger);
 	int (*assign_group)(struct switch_port_led *led, struct led_port_group *group,
@@ -163,34 +163,36 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 	}
 
 enum rtl83xx_port_trigger {
-	RTL83XX_TRIG_LINK_ACT = 0,
-	RTL83XX_TRIG_LINK = 1,
-	RTL83XX_TRIG_ACT = 2,
-	RTL83XX_TRIG_ACT_RX = 3,
-	RTL83XX_TRIG_ACT_TX = 4,
-	RTL83XX_TRIG_DUPLEX_MODE = 6,
-	RTL83XX_TRIG_LINK_1G = 7,
-	RTL83XX_TRIG_LINK_100M = 8,
-	RTL83XX_TRIG_LINK_10M = 9,
-	RTL83XX_TRIG_LINK_ACT_1G = 10,
-	RTL83XX_TRIG_LINK_ACT_100M = 11,
-	RTL83XX_TRIG_LINK_ACT_10M = 12,
-	RTL83XX_TRIG_LINK_ACT_1G_100M = 13,
-	RTL83XX_TRIG_LINK_ACT_1G_10M = 14,
-	RTL83XX_TRIG_LINK_ACT_100M_10M = 15,
-	RTL83XX_TRIG_LINK_ACT_10G = 21,
-	RTL83XX_TRIG_DISABLED = 31,
+	RTL83XX_TRIG_LINK_ACT		= 0,
+	RTL83XX_TRIG_LINK		= 1,
+	RTL83XX_TRIG_ACT		= 2,
+	RTL83XX_TRIG_ACT_RX		= 3,
+	RTL83XX_TRIG_ACT_TX		= 4,
+	RTL83XX_TRIG_DUPLEX_MODE	= 6,
+	RTL83XX_TRIG_LINK_1G		= 7,
+	RTL83XX_TRIG_LINK_100M		= 8,
+	RTL83XX_TRIG_LINK_10M		= 9,
+	RTL83XX_TRIG_LINK_ACT_1G	= 10,
+	RTL83XX_TRIG_LINK_ACT_100M	= 11,
+	RTL83XX_TRIG_LINK_ACT_10M	= 12,
+	RTL83XX_TRIG_LINK_ACT_1G_100M	= 13,
+	RTL83XX_TRIG_LINK_ACT_1G_10M	= 14,
+	RTL83XX_TRIG_LINK_ACT_100M_10M	= 15,
+	RTL83XX_TRIG_LINK_ACT_10G	= 21,
+	RTL83XX_TRIG_DISABLED		= 31,
 };
 
 static const struct led_port_modes rtl8380_port_led_modes = {
 	.off = 0,
 	.on = 5,
-	.blink  = {{  32, 1},
-		   {  64, 2},
-		   { 128, 3},
-		   { 256, 6},
-		   { 512, 4},
-		   {1024, 7}}
+	.blink  = {
+		{  32, 1},
+		{  64, 2},
+		{ 128, 3},
+		{ 256, 6},
+		{ 512, 4},
+		{1024, 7}
+	},
 };
 
 static int rtl83xx_port_trigger_xlate(u32 port_led_trigger)
