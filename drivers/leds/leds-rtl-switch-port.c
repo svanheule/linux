@@ -68,6 +68,7 @@ struct switch_port_led {
 	struct switch_port_led_ctrl *ctrl;
 	unsigned int port;
 	unsigned int index;
+	bool is_primary;
 	u32 trigger_flags;
 	struct led_port_group *current_group;
 };
