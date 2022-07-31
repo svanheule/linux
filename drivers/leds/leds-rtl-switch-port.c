@@ -61,17 +61,7 @@ struct led_port_group {
 
 #define GROUP_LIST_INDEX(cfg, grp, idx)		((cfg)->port_led_count * (grp) + (idx))
 
-struct switch_port_led_config;
-
-struct switch_port_led_ctrl {
-	struct device *dev;
-	struct regmap *map;
-	const struct switch_port_led_config *cfg;
-	struct mutex lock;
-	unsigned long *ports_copper;
-	unsigned long *ports_sfp;
-	struct led_port_group *groups;
-};
+struct switch_port_led_ctrl;
 
 struct switch_port_led {
 	struct led_classdev led;
@@ -105,6 +95,16 @@ struct switch_port_led_config {
 	int (*assign_group)(struct switch_port_led *led, struct led_port_group *group,
 		u32 port_types);
 	struct reg_field group_settings[];
+};
+
+struct switch_port_led_ctrl {
+	struct device *dev;
+	struct regmap *map;
+	const struct switch_port_led_config *cfg;
+	struct mutex lock;
+	unsigned long *ports_copper;
+	unsigned long *ports_sfp;
+	struct led_port_group *groups;
 };
 
 static struct led_port_group *switch_port_led_get_group(
