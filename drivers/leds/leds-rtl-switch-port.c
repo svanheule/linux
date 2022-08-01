@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 
+#include <linux/bitfield.h>
+#include <linux/bitops.h>
+#include <linux/bits.h>
 #include <linux/leds.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/syscon.h>
@@ -27,15 +30,15 @@
 /*
  * Realtek switch port LED
  *
- * The switch ASIC can control up to three LEDs per phy, based on a number of
+ * The switch ASIC can control multiple LEDs per phy, based on a number of
  * matching conditions. Alternatively, each individual LED output can also be
  * configured for manual control.
  */
 enum rtl_led_output_mode {
-	RTL_LED_OUTPUT_SERIAL = 0,
-	RTL_LED_OUTPUT_SCAN_SINGLE = 1,
-	RTL_LED_OUTPUT_SCAN_BICOLOR = 2,
-	RTL_LED_OUTPUT_DISABLED = 3,
+	RTL_LED_OUTPUT_SERIAL		= 0,
+	RTL_LED_OUTPUT_SCAN_SINGLE	= 1,
+	RTL_LED_OUTPUT_SCAN_BICOLOR	= 2,
+	RTL_LED_OUTPUT_DISABLED		= 3,
 };
 
 struct led_port_blink_mode {
@@ -131,7 +134,7 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 	int err;
 
 	if (rtl_trg < 0)
-	       return ERR_PTR(rtl_trg);
+		return ERR_PTR(rtl_trg);
 
 	for (i = 0; i < led->ctrl->cfg->group_count; i++) {
 		group = switch_port_led_get_group(led, i);
@@ -191,6 +194,7 @@ enum rtl83xx_port_trigger {
 static const struct led_port_modes rtl8380_port_led_modes = {
 	.off = 0,
 	.on = 5,
+	/* Modes 6 and 7 appear to be a late addition to the list */
 	.blink  = {
 		{  32, 1},
 		{  64, 2},
@@ -484,12 +488,14 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 static const struct led_port_modes rtl8390_port_led_modes = {
 	.off = 0,
 	.on = 7,
-	.blink = {{  32, 1},
-		  {  64, 2},
-		  { 128, 3},
-		  { 256, 4},
-		  { 512, 5},
-		  {1024, 6}}
+	.blink = {
+		{  32, 1},
+		{  64, 2},
+		{ 128, 3},
+		{ 256, 4},
+		{ 512, 5},
+		{1024, 6}
+	},
 };
 
 static void rtl8390_port_commit(struct switch_port_led_ctrl *ctrl)
@@ -995,9 +1001,21 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	if (IS_ERR_OR_NULL(ctrl->map))
 		return dev_err_probe(dev, PTR_ERR(ctrl->map), "failed to find parent regmap\n");
 
+	err = fwnode_property_read_string(dev_fwnode(dev), "realtek,output-mode", &mode_name);
+	if (err)
+		return dev_err_probe(dev, err, "failed to read realtek,output-mode\n");
+
+	if (strcmp(mode_name, "serial") == 0)
+		mode = RTL_LED_OUTPUT_SERIAL;
+	else if (strcmp(mode_name, "single-color-scan") == 0)
+		mode = RTL_LED_OUTPUT_SCAN_SINGLE;
+	else if (strcmp(mode_name, "bi-color-scan") == 0)
+		mode = RTL_LED_OUTPUT_SCAN_BICOLOR;
+	else
+		return dev_err_probe(dev, -EINVAL, "realtek,output-mode invalid\n");
+
 	member_map_count = ctrl->cfg->port_led_count * ctrl->cfg->group_count;
-	ctrl->groups = devm_kcalloc(dev, member_map_count,
-		sizeof(*ctrl->groups), GFP_KERNEL);
+	ctrl->groups = devm_kcalloc(dev, member_map_count, sizeof(*ctrl->groups), GFP_KERNEL);
 	if (!ctrl->groups)
 		return -ENOMEM;
 
@@ -1027,19 +1045,6 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	err = devm_led_trigger_register(dev, &switch_port_rtl_hw_trigger);
 	if (err)
 		return dev_err_probe(dev, err, "failed to register private trigger");
-
-	err = fwnode_property_read_string(dev_fwnode(dev), "realtek,output-mode", &mode_name);
-	if (err)
-		return dev_err_probe(dev, err, "failed to read realtek,output-mode\n");
-
-	if (strcmp(mode_name, "serial") == 0)
-		mode = RTL_LED_OUTPUT_SERIAL;
-	else if (strcmp(mode_name, "single-color-scan") == 0)
-		mode = RTL_LED_OUTPUT_SCAN_SINGLE;
-	else if (strcmp(mode_name, "bi-color-scan") == 0)
-		mode = RTL_LED_OUTPUT_SCAN_BICOLOR;
-	else
-		return dev_err_probe(dev, -EINVAL, "realtek,output-mode invalid\n");
 
 	for_each_available_child_of_node(np, child) {
 		if (of_n_addr_cells(child) != 3) {
