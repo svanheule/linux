@@ -10,13 +10,13 @@
 
 #define NETGEAR_PORT_LED(phy)			\
 	led@##phy##.0 {				\
-		reg = <(phy) 0>;		\
+		reg = <(phy) 0 0>;		\
 		color = <LED_COLOR_ID_GREEN>;	\
 		function = LED_FUNCTION_LAN;	\
 		function-enumerator = <(phy)>;	\
 	};					\
 	led@##phy##.1 {				\
-		reg = <(phy) 1>;		\
+		reg = <(phy) 1 0>;		\
 		color = <LED_COLOR_ID_AMBER>;	\
 		function = LED_FUNCTION_LAN;	\
 		function-enumerator = <(phy)>;	\
@@ -143,8 +143,10 @@
 
 		port-leds {
 			compatible = "realtek,rtl8380-port-led";
-			#address-cells = <2>;
+			#address-cells = <3>;
 			#size-cells = <0>;
+
+			realtek,output-mode = "serial";
 
 			NETGEAR_PORT_LED(8);
 			NETGEAR_PORT_LED(9);
@@ -154,6 +156,8 @@
 			NETGEAR_PORT_LED(13);
 			NETGEAR_PORT_LED(14);
 			NETGEAR_PORT_LED(15);
+			NETGEAR_PORT_LED(16);
+			NETGEAR_PORT_LED(17);
 		};
 	};
 };
