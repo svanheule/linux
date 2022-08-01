@@ -11,6 +11,19 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 
+/* TODO Change to tx/rx/link sysfs attributes like netdev? */
+/* Hardware independent port trigger flag list */
+#define PTRG_NONE		0
+#define PTRG_ACT_RX		BIT(0)
+#define PTRG_ACT_TX		BIT(1)
+#define PTRG_ACT		(PTRG_ACT_RX | PTRG_ACT_TX)
+#define PTRG_LINK_10		BIT(2)
+#define PTRG_LINK_100		BIT(3)
+#define PTRG_LINK_1000		BIT(4)
+#define PTRG_LINK_2500		BIT(5)
+#define PTRG_LINK_5000		BIT(6)
+#define PTRG_LINK_10000		BIT(7)
+
 /*
  * Realtek switch port LED
  *
@@ -24,20 +37,6 @@ enum rtl_led_output_mode {
 	RTL_LED_OUTPUT_SCAN_BICOLOR = 2,
 	RTL_LED_OUTPUT_DISABLED = 3,
 };
-
-#define PTRG_NONE		0
-#define PTRG_PORT_COPPER	BIT(0)
-#define PTRG_PORT_SFP		BIT(1)
-#define PTRG_PORT		(PTRG_PORT_COPPER | PTRG_PORT_SFP)
-#define PTRG_ACT_RX		BIT(2)
-#define PTRG_ACT_TX		BIT(3)
-#define PTRG_ACT		(PTRG_ACT_RX | PTRG_ACT_TX)
-#define PTRG_LINK_10		BIT(4)
-#define PTRG_LINK_100		BIT(5)
-#define PTRG_LINK_1000		BIT(6)
-#define PTRG_LINK_2500		BIT(7)
-#define PTRG_LINK_5000		BIT(8)
-#define PTRG_LINK_10000		BIT(9)
 
 struct led_port_blink_mode {
 	u16 interval; /* Toggle interval in ms */
@@ -66,26 +65,27 @@ struct switch_port_led_ctrl;
 struct switch_port_led {
 	struct led_classdev led;
 	struct switch_port_led_ctrl *ctrl;
-	unsigned int port;
-	unsigned int index;
-	bool is_primary;
-	u32 trigger_flags;
 	struct led_port_group *current_group;
+	u32 trigger_flags;
+	u8 port;
+	u8 index;
+	bool is_secondary;
 };
 
 struct switch_port_led_config {
 	unsigned int port_count;
 	unsigned int port_led_count;
 	unsigned int group_count;
+	bool independent_secondaries;
 	const struct led_port_modes *modes;
-	/* Set the number of LEDs per port */
-	int (*port_led_init)(struct switch_port_led_ctrl *ctrl, unsigned int led_count,
-		enum rtl_led_output_mode mode);
-	/* Enable or disable all LEDs for a certain port */
-	int (*set_port_enabled)(struct switch_port_led *led, bool enabled);
+	/* Configure and start the peripheral */
+	int (*init)(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode);
+	/* Switch between HW offloading or user control */
 	int (*set_hw_managed)(struct switch_port_led *led, bool hw_managed);
+	/* Read/write user modes */
 	int (*write_mode)(struct switch_port_led *led, unsigned int mode);
 	int (*read_mode)(struct switch_port_led *led);
+	/* Translate a generic trigger to a gen-specific one */
 	int (*trigger_xlate)(struct switch_port_led *led, u32 trigger);
 	/*
 	 * Find the group the LED with this trigger setting can be assigned to.
@@ -93,9 +93,15 @@ struct switch_port_led_config {
 	 * group. Return a group on success, or < 0 on failure.
 	 */
 	struct led_port_group *(*map_group)(struct switch_port_led *led, u32 trigger);
-	int (*assign_group)(struct switch_port_led *led, struct led_port_group *group,
-		u32 port_types);
+	/* Configure the LED for HW offloading according to the provided group settings */
+	int (*assign_group)(struct switch_port_led *led, struct led_port_group *group);
 	struct reg_field group_settings[];
+};
+
+struct switch_port_led_mask {
+	/* TODO could use two :4 bit fields */
+	u8 primary;
+	u8 secondary;
 };
 
 struct switch_port_led_ctrl {
@@ -103,8 +109,7 @@ struct switch_port_led_ctrl {
 	struct regmap *map;
 	const struct switch_port_led_config *cfg;
 	struct mutex lock;
-	unsigned long *ports_copper;
-	unsigned long *ports_sfp;
+	struct switch_port_led_mask *available_leds;
 	struct led_port_group *groups;
 };
 
@@ -138,8 +143,8 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 			return group;
 	}
 
-	dev_warn(ctrl->dev, "no available group for (%d,%d): 0x%02x\n",
-		led->port, led->index, rtl_trg);
+	dev_warn(ctrl->dev, "no available group for (%d,%d,%d) with trigger 0x%02x\n",
+		led->port, led->index, led->is_secondary, rtl_trg);
 	return ERR_PTR(-ENOSPC);
 }
 
@@ -198,7 +203,7 @@ static const struct led_port_modes rtl8380_port_led_modes = {
 
 static int rtl83xx_port_trigger_xlate(u32 port_led_trigger)
 {
-	switch (port_led_trigger & ~PTRG_PORT) {
+	switch (port_led_trigger) {
 	case PTRG_NONE:
 		return RTL83XX_TRIG_DISABLED;
 	case PTRG_ACT_RX:
@@ -238,9 +243,6 @@ static int rtl83xx_port_trigger_xlate(u32 port_led_trigger)
 
 static int rtl8380_port_trigger_xlate(struct switch_port_led *led, u32 port_led_trigger)
 {
-	if (led->port < 20 && (port_led_trigger & PTRG_PORT_SFP))
-		return -EINVAL;
-
 	if (port_led_trigger & (PTRG_LINK_2500 | PTRG_LINK_5000 | PTRG_LINK_10000))
 		return -EINVAL;
 
@@ -265,12 +267,12 @@ static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led 
 	int err;
 
 	if (rtl_trigger < 0)
-	       return ERR_PTR(rtl_trigger);
+		return ERR_PTR(rtl_trigger);
 
-	if (led->port > 23)
-		group = switch_port_led_get_group(led, 1);
-	else
+	if (led->port < 24)
 		group = switch_port_led_get_group(led, 0);
+	else
+		group = switch_port_led_get_group(led, 1);
 
 	err = regmap_field_read(group->setting, &current_trigger);
 	if (err)
@@ -285,53 +287,19 @@ static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led 
 	return group;
 }
 
-int rtl8380_port_led_assign_group(struct switch_port_led *led,
-	struct led_port_group *group, u32 port_types)
+int rtl8380_port_led_assign_group(struct switch_port_led *led, struct led_port_group *group)
 {
+	/*
+	 * FIXME Should we check at all?
+	 * map_group() will only provide valid groups anyway, so this is redundant
+	 * in theory
+	 */
 	/* FIXME Use macro for port count */
-	DECLARE_BITMAP(illegal_combo_ports, 28);
-	u32 combo_port_mask = GENMASK(8, 7);
-	struct led_port_group *other_group;
-	u32 combo_port_new;
-	u32 combo_port_old;
-	u32 val = 0;
-
 	/* Doesn't match static groups */
 	if ((led->port < 24 && group->index == 1) || (led->port >= 24 && group->index == 0))
 		return -EINVAL;
 
-	/* No combo port, no problem */
-	if ((port_types & PTRG_PORT) != (PTRG_PORT_COPPER | PTRG_PORT_SFP))
-		return 0;
-
-	if (led->port < 24) {
-		combo_port_new = 1;
-		other_group = switch_port_led_get_group(led, 1);
-		bitmap_set(illegal_combo_ports, 24, 4);
-	} else {
-		combo_port_new = 2;
-		other_group = switch_port_led_get_group(led, 0);
-		bitmap_set(illegal_combo_ports, 20, 4);
-	}
-
-	regmap_read(led->ctrl->map, RTL8380_REG_LED_GLB_CTRL, &val);
-	combo_port_old = FIELD_GET(combo_port_mask, val);
-
-	/* Can't change the setting until the other group is empty */
-	if (combo_port_old != combo_port_new
-		&& bitmap_intersects(other_group->ports, illegal_combo_ports, 28))
-		return -EBUSY;
-
-	return regmap_update_bits(led->ctrl->map, RTL8380_REG_LED_GLB_CTRL,
-		combo_port_mask, combo_port_new);
-}
-
-static int rtl8380_port_led_set_port_enabled(struct switch_port_led *led, bool enabled)
-{
-	unsigned int reg = RTL8380_REG_LED_P_EN_CTRL;
-	u32 val = enabled ? BIT(led->port) : 0;
-
-	return regmap_update_bits(led->ctrl->map, reg, BIT(led->port), val);
+	return 0;
 }
 
 static int rtl8380_port_led_set_hw_managed(struct switch_port_led *led, bool hw_managed)
@@ -364,29 +332,115 @@ static int rtl8380_port_led_read_mode(struct switch_port_led *led)
 	return (val >> (3 * led->index)) & GENMASK(2, 0);
 }
 
-static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl,
-	unsigned int led_count, enum rtl_led_output_mode mode)
+static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
 {
-	u32 led_count_mask, led_mask;
+	const struct switch_port_led_mask *led_masks;
+	unsigned int led_enable_mask_high = 0;
+	unsigned int led_enable_mask_low = 0;
+	unsigned int combo_port_min = ctrl->cfg->port_count;
+	unsigned int combo_port_max = 0;
+	unsigned int combo_port_val = 0;
+	unsigned int port;
+	u32 port_mask;
 	int err;
 
-	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_MODE_SEL, GENMASK(1, 0), mode);
+	/* Disable all LEDs, (re-)enable when configuring */
+	regmap_write(ctrl->map, RTL8380_REG_LED_P_EN_CTRL, 0);
+
+	for (port = 0; port < ctrl->cfg->port_count; port++) {
+		/* Overlay all the individual masks */
+		led_masks = &ctrl->available_leds[port];
+		port_mask = led_masks->primary | led_masks->secondary;
+
+		if (!port_mask)
+			continue;
+
+		if (port < 24) /* FIXME replace with macro */
+			led_enable_mask_low |= port_mask;
+		else
+			led_enable_mask_high |= port_mask;
+
+		if (led_masks->primary && led_masks->secondary) {
+			combo_port_min = min(combo_port_min, port);
+			combo_port_max = max(combo_port_max, port);
+		}
+
+		/* Enable a port if any LED is used, disable otherwise */
+		err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_P_EN_CTRL, BIT(port), BIT(port));
+		if (err)
+			return err;
+	}
+
+	/*
+	 * Combo ports are allowed in either [20, 23] or [24, 27].
+	 * Setting the combo port field to a non-zero value, will cause extra
+	 * LED values to be scanned out at the end of the chain. The number of
+	 * extra LEDs depends on the number of ports that is enabled (LED wise)
+	 * in the applicable range.
+	 */
+	if (combo_port_min < 20) {
+		dev_err(ctrl->dev, "combo ports < 20 not supported\n");
+		return -EINVAL;
+	}
+	if (combo_port_min < 24 && combo_port_max >= 24) {
+		dev_err(ctrl->dev, "illegal combo port combination\n");
+		return -EINVAL;
+	}
+
+	if (combo_port_min < 24)
+		combo_port_val = 1;
+	else if (combo_port_min < ctrl->cfg->port_count)
+		combo_port_val = 2;
+
+	/* FIXME macros */
+	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, GENMASK(8, 7),
+			FIELD_PREP(GENMASK(8, 7), combo_port_val));
 	if (err)
 		return err;
 
-	led_count_mask = GENMASK(led_count - 1, 0);
-	led_mask = GENMASK(5, 0);
-	return regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, led_mask,
-			(led_count_mask << 3) | led_count_mask);
+	/*
+	 * The number-of-LEDs-per-port fields require a mask instead of a number.
+	 * All lowest bits must be set, so e.g. BIT(1) is disallowed.
+	 *
+	 * According to the SDK, the high port mask cannot be empty, even if
+	 * none of the LEDs are used. If no LEDs are configured, we must use the
+	 * value of the low port mask.
+	 */
+	if (led_enable_mask_low) {
+		led_enable_mask_low = GENMASK(fls(led_enable_mask_low) - 1, 0);
+
+		if (!led_enable_mask_high)
+			led_enable_mask_high = led_enable_mask_low;
+	}
+	if (led_enable_mask_high)
+		led_enable_mask_high = GENMASK(fls(led_enable_mask_high) - 1, 0);
+
+	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, GENMASK(5, 0),
+			(led_enable_mask_high << 3) | led_enable_mask_low);
+	if (err)
+		return err;
+
+	/* Set mode to enable output */
+	err = regmap_write(ctrl->map, RTL8380_REG_LED_MODE_SEL, mode);
+
+	for (int i = 0xa000; i < 0xa08c; i += 16) {
+		u32 reg[4];
+		for (int j = 0; j < 4; j++)
+			regmap_read(ctrl->map, i + 4 * j, &reg[j]);
+
+		dev_info(ctrl->dev, "%04x : %08x %08x %08x %08x", i, reg[0], reg[1], reg[2], reg[3]);
+	}
+
+	return err;
 }
 
 static const struct switch_port_led_config rtl8380_port_led_config = {
 	.port_count = 28,
 	.port_led_count = 3,
 	.group_count = 2,
+	.independent_secondaries = false,
 	.modes = &rtl8380_port_led_modes,
-	.port_led_init = rtl8380_port_led_init,
-	.set_port_enabled = rtl8380_port_led_set_port_enabled,
+	.init = rtl8380_port_led_init,
 	.set_hw_managed = rtl8380_port_led_set_hw_managed,
 	.write_mode = rtl8380_port_led_write_mode,
 	.read_mode = rtl8380_port_led_read_mode,
@@ -407,14 +461,14 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
  * SoC specific implementation for RTL8390 series (Cypress)
  */
 #define RTL8390_REG_LED_GLB_CTRL		0x00e4
-#define RTL8390_REG_LED_COPR_SET_SEL_CTRL(led)	(0x00f0 + 4 * ((led)->port / 16))
-#define RTL8390_REG_LED_FIB_SET_SEL_CTRL(led)	(0x0100 + 4 * ((led)->port / 16))
-#define RTL8390_REG_LED_COPR_PMASK_CTRL(led)	(0x0110 + 4 * ((led)->port / 32))
-#define RTL8390_REG_LED_FIB_PMASK_CTRL(led)	(0x0118 + 4 * ((led)->port / 32))
-#define RTL8390_REG_LED_COMBO_CTRL(led)		(0x0120 + 4 * ((led)->port / 32))
+#define RTL8390_REG_LED_COPR_SET_SEL_CTRL(port)	(0x00f0 + 4 * ((port) / 16))
+#define RTL8390_REG_LED_FIB_SET_SEL_CTRL(port)	(0x0100 + 4 * ((port) / 16))
+#define RTL8390_REG_LED_COPR_PMASK_CTRL(port)	(0x0110 + 4 * ((port) / 32))
+#define RTL8390_REG_LED_FIB_PMASK_CTRL(port)	(0x0118 + 4 * ((port) / 32))
+#define RTL8390_REG_LED_COMBO_CTRL(port)		(0x0120 + 4 * ((port) / 32))
 #define RTL8390_REG_LED_SW_CTRL			0x0128
-#define RTL8390_REG_LED_SW_P_EN_CTRL(led)	(0x012c + 4 * ((led)->port / 10))
-#define RTL8390_REG_LED_SW_P_CTRL(led)		(0x0144 + 4 * (led)->port)
+#define RTL8390_REG_LED_SW_P_EN_CTRL(port)	(0x012c + 4 * ((port) / 10))
+#define RTL8390_REG_LED_SW_P_CTRL(port)		(0x0144 + 4 * (port))
 
 #define RTL8390_PORT_LED_COUNT			3
 #define RTL8390_GROUP_SETTING_WIDTH		5
@@ -455,56 +509,27 @@ static int rtl8390_port_trigger_xlate(struct switch_port_led *led, u32 port_led_
 	return rtl83xx_port_trigger_xlate(port_led_trigger);
 }
 
-int rtl8390_port_led_assign_group(struct switch_port_led *led,
-	struct led_port_group *group, u32 port_type)
+int rtl8390_port_led_assign_group(struct switch_port_led *led, struct led_port_group *group)
 {
-	unsigned int reg_set_copper = RTL8390_REG_LED_COPR_SET_SEL_CTRL(led);
-	unsigned int reg_mask_copper = RTL8390_REG_LED_COPR_PMASK_CTRL(led);
-	unsigned int reg_set_sfp = RTL8390_REG_LED_FIB_SET_SEL_CTRL(led);
-	unsigned int reg_mask_sfp = RTL8390_REG_LED_FIB_PMASK_CTRL(led);
 	unsigned int shift = 2 * (led->port % 16);
-	u32 pmask = BIT(led->port % 32);
 	u32 mask = GENMASK(1, 0) << shift;
 	u32 val = group->index << shift;
+	unsigned int reg_set;
 
-	// TODO Need to assign COPPER, first group to SW-only LED
-	if (port_type & PTRG_PORT_COPPER) {
-		regmap_update_bits(led->ctrl->map, reg_set_copper, mask, val);
-		regmap_update_bits(led->ctrl->map, reg_mask_copper, pmask, 1);
-	} else
-		regmap_update_bits(led->ctrl->map, reg_mask_copper, pmask, 0);
-
-	if (port_type & PTRG_PORT_SFP) {
-		regmap_update_bits(led->ctrl->map, reg_set_sfp, mask, val);
-		regmap_update_bits(led->ctrl->map, reg_mask_sfp, pmask, 1);
-	} else
-		regmap_update_bits(led->ctrl->map, reg_mask_sfp, pmask, 0);
-
-	if ((port_type & PTRG_PORT) == (PTRG_PORT_COPPER | PTRG_PORT_SFP))
-		regmap_update_bits(led->ctrl->map, RTL8390_REG_LED_COMBO_CTRL(led), pmask, 1);
+	if (led->is_secondary)
+		reg_set = RTL8390_REG_LED_FIB_SET_SEL_CTRL(led->port);
 	else
-		regmap_update_bits(led->ctrl->map, RTL8390_REG_LED_COMBO_CTRL(led), pmask, 0);
+		reg_set = RTL8390_REG_LED_COPR_SET_SEL_CTRL(led->port);
 
-	return 0;
-}
-
-static int rtl8390_port_led_set_port_enabled(struct switch_port_led *led, bool enabled)
-{
-	/* Always enable a port as copper-only */
-	int reg = RTL8390_REG_LED_COPR_PMASK_CTRL(led);
-	u32 field_mask = BIT(led->port % 32);
-	u32 val = enabled ? field_mask : 0;
-
-	// TODO just use ... ?
-	// return rtl8390_port_led_assign_group(led, 0, enabled ? PTRG_PORT_COPPER : 0);
-
-	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
+	dev_info(led->ctrl->dev, "%04x & %08x <- %08x", reg_set, mask, val);
+	return regmap_update_bits(led->ctrl->map, reg_set, mask, val);
 }
 
 static int rtl8390_port_led_set_hw_managed(struct switch_port_led *led, bool hw_managed)
 {
-	int reg = RTL8390_REG_LED_SW_P_EN_CTRL(led);
+	/* TODO Macro? */
 	u32 field_mask = BIT(3 * (led->port % 10) + led->index);
+	int reg = RTL8390_REG_LED_SW_P_EN_CTRL(led->port);
 	u32 val = hw_managed ? 0 : field_mask;
 
 	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
@@ -512,7 +537,7 @@ static int rtl8390_port_led_set_hw_managed(struct switch_port_led *led, bool hw_
 
 static int rtl8390_port_led_write_mode(struct switch_port_led *led, unsigned int mode)
 {
-	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led);
+	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led->port);
 	unsigned int shift = led->index * 3;
 	u32 mask = GENMASK(2, 0) << shift;
 	u32 value = mode << shift;
@@ -527,7 +552,7 @@ static int rtl8390_port_led_write_mode(struct switch_port_led *led, unsigned int
 
 static int rtl8390_port_led_read_mode(struct switch_port_led *led)
 {
-	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led);
+	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led->port);
 	unsigned int shift = led->index * 3;
 	u32 val;
 	int err;
@@ -536,29 +561,96 @@ static int rtl8390_port_led_read_mode(struct switch_port_led *led)
 	if (err)
 		return err;
 
+	/* FIXME FIELD_GET */
 	return (val >> shift) & GENMASK(2, 0);
 }
 
-static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl,
-	unsigned int led_count, enum rtl_led_output_mode mode)
+static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
 {
-	u32 count_mask = GENMASK(3, 2);
-	u32 mode_mask = GENMASK(1, 0);
+	static const u32 output_mode_mask = GENMASK(1, 0);
+	static const u32 led_count_mask = GENMASK(3, 2);
+	struct switch_port_led_mask *led_mask;
 	u32 enable = BIT(5);
-	u32 count_val = FIELD_PREP(count_mask, led_count);
-	u32 mode_val = FIELD_PREP(mode_mask, mode);
+	u32 led_count = 0;
+	unsigned int port;
+	u32 pmask_val;
+	int err;
 
-	return regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL,
-		count_mask | enable | mode_mask, count_val | enable | mode_val);
+	/* Clear {COPR,FIB}_PMASK registers to disable all LEDs */
+	for (port = 0; port < ctrl->cfg->port_count; port += 32) {
+		regmap_write(ctrl->map, RTL8390_REG_LED_COPR_PMASK_CTRL(port), 0);
+		regmap_write(ctrl->map, RTL8390_REG_LED_FIB_PMASK_CTRL(port), 0);
+	}
+
+	for (port = 0; port < ctrl->cfg->port_count; port++) {
+		led_mask = &ctrl->available_leds[port];
+
+		if (!led_mask->primary && !led_mask->secondary)
+			continue;
+
+		led_count = max(led_count, (u32) fls(led_mask->primary | led_mask->secondary));
+		pmask_val = BIT(port % 32);
+
+		/*
+		 * FIXME set both bits on (primary OR secondary)?
+		 * to make sure we will always trigger on port state
+		 */
+		//if (led_mask->primary) {
+		//	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COPR_PMASK_CTRL(port), pmask_val, pmask_val);
+		//	if (err)
+		//		return err;
+		//}
+		//if (led_mask->secondary) {
+		//	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_FIB_PMASK_CTRL(port), pmask_val, pmask_val);
+		//	if (err)
+		//		return err;
+		//}
+		/*
+		 * SDK will only set the COPR_PMASK bit if an RJ45 port is
+		 * present, and FIB_PMASK if an SFP cage is present.
+		 * Here instead, always trigger on both port types, but tell the
+		 * hardware there is only one LED for our (fake) combo port.
+		 * A real combo port with one LED should thus only ever need to
+		 * specify a primary LED, consistent with the physical LED
+		 * layout.
+		 */
+		err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COPR_PMASK_CTRL(port), pmask_val, pmask_val);
+		if (err)
+			return err;
+		err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_FIB_PMASK_CTRL(port), pmask_val, pmask_val);
+		if (err)
+			return err;
+
+		/* If not both primary and secondary are provided, merge LEDs */
+		if (!(led_mask->primary && led_mask->secondary)) {
+			err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COMBO_CTRL(port), pmask_val, pmask_val);
+			if (err)
+				return err;
+		}
+	}
+
+	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL,
+		enable | led_count_mask | output_mode_mask,
+		enable | FIELD_PREP(led_count_mask, led_count) | FIELD_PREP(output_mode_mask, mode));
+
+	for (int i = 0x00e0; i < 0x0214; i += 16) {
+		u32 reg[4];
+		for (int j = 0; j < 4; j++)
+			regmap_read(ctrl->map, i + 4 * j, &reg[j]);
+
+		dev_info(ctrl->dev, "%04x : %08x %08x %08x %08x", i, reg[0], reg[1], reg[2], reg[3]);
+	}
+
+	return err;
 }
 
 static const struct switch_port_led_config rtl8390_port_led_config = {
 	.port_count = 52,
 	.port_led_count = 3,
 	.group_count = 4,
+	.independent_secondaries = true,
 	.modes = &rtl8390_port_led_modes,
-	.port_led_init = rtl8390_port_led_init,
-	.set_port_enabled = rtl8390_port_led_set_port_enabled,
+	.init = rtl8390_port_led_init,
 	.set_hw_managed = rtl8390_port_led_set_hw_managed,
 	.write_mode = rtl8390_port_led_write_mode,
 	.read_mode = rtl8390_port_led_read_mode,
@@ -695,16 +787,10 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 				goto err_out;
 		}
 
-		err = ctrl->cfg->assign_group(pled, new_group, value & PTRG_PORT);
+		err = ctrl->cfg->assign_group(pled, new_group);
 		if (err)
 			goto err_out;
 
-		bitmap_clear(group->ports, pled->port, 1);
-		bitmap_set(new_group->ports, pled->port, 1);
-		if (trigger & TRG_PORT_COPPER)
-			bitmap_set(ctrl->ports_copper, pled->port, 1);
-		if (trigger & TRG_PORT_SFP)
-			bitmap_set(ctrl->ports_sfp, pled->port, 1);
 		pled->current_group = new_group;
 	}
 
@@ -756,6 +842,7 @@ static int switch_port_led_trigger_activate(struct led_classdev *led_cdev)
 
 	bitmap_set(group->ports, pled->port, 1);
 	pled->current_group = group;
+	pled->ctrl->cfg->assign_group(pled, group);
 
 	err = pled->ctrl->cfg->set_hw_managed(pled, true);
 
@@ -788,41 +875,10 @@ static struct led_trigger switch_port_rtl_hw_trigger = {
 	.trigger_type = &switch_port_rtl_hw_trigger_type,
 };
 
-static void realtek_port_led_read_address(struct device_node *np,
-	int *port_index, int *led_index)
-{
-	const __be32 *addr;
-
-	addr = of_get_address(np, 0, NULL, NULL);
-	if (addr) {
-		*port_index = of_read_number(addr, 1);
-		*led_index = of_read_number(addr + 1, 1);
-	}
-}
-
-static struct switch_port_led *switch_port_led_probe_single(
-	struct switch_port_led_ctrl *ctrl, struct device_node *np)
+static int switch_port_register_classdev(struct switch_port_led *pled, struct device_node *np)
 {
 	struct led_init_data init_data = {};
-	struct switch_port_led *pled;
-	unsigned int port_index;
-	unsigned int led_index;
 	int err;
-
-	realtek_port_led_read_address(np, &port_index, &led_index);
-
-	if (port_index >= ctrl->cfg->port_count || led_index >= ctrl->cfg->port_led_count)
-		return ERR_PTR(-ENODEV);
-
-	pled = devm_kzalloc(ctrl->dev, sizeof(*pled), GFP_KERNEL);
-	if (!pled)
-		return ERR_PTR(-ENOMEM);
-
-	init_data.fwnode = of_fwnode_handle(np);
-
-	pled->ctrl = ctrl;
-	pled->port = port_index;
-	pled->index = led_index;
 
 	pled->led.max_brightness = 1;
 	pled->led.brightness_set = switch_port_led_brightness_set;
@@ -830,18 +886,77 @@ static struct switch_port_led *switch_port_led_probe_single(
 	pled->led.blink_set = switch_port_led_blink_set;
 	pled->led.trigger_type = &switch_port_rtl_hw_trigger_type;
 
-	ctrl->cfg->set_hw_managed(pled, false);
-	ctrl->cfg->set_port_enabled(pled, true);
+	init_data.fwnode = of_fwnode_handle(np);
 
-	err = devm_led_classdev_register_ext(ctrl->dev, &pled->led, &init_data);
+	err = devm_led_classdev_register_ext(pled->ctrl->dev, &pled->led, &init_data);
 	if (err)
-		return ERR_PTR(err);
+		return err;
 
 	err = devm_device_add_groups(pled->led.dev, rtl_hw_trigger_groups);
 	if (err)
-		return ERR_PTR(err);
+		return err;
 
 	dev_set_drvdata(pled->led.dev, pled);
+
+	return 0;
+}
+
+static struct switch_port_led *switch_port_led_probe_single(
+	struct switch_port_led_ctrl *ctrl, struct device_node *np)
+{
+	struct switch_port_led *pled;
+	unsigned int port_index;
+	unsigned int led_index;
+	const __be32 *addr;
+	bool is_secondary;
+	int err;
+
+	addr = of_get_address(np, 0, NULL, NULL);
+	if (!addr) {
+		dev_warn(ctrl->dev, "failed to read led address\n");
+		return ERR_PTR(-ENODEV);
+	}
+
+	port_index = of_read_number(addr, 1);
+	led_index = of_read_number(addr + 1, 1);
+	is_secondary = !!of_read_number(addr + 2, 1);
+
+	if (port_index >= ctrl->cfg->port_count) {
+		dev_warn(ctrl->dev, "invalid port number %d\n", port_index);
+		return ERR_PTR(-ENODEV);
+	}
+	if (led_index >= ctrl->cfg->port_led_count) {
+		dev_warn(ctrl->dev, "invalid LED index %d\n", led_index);
+		return ERR_PTR(-ENODEV);
+	}
+
+	if (!is_secondary)
+		ctrl->available_leds[port_index].primary |= BIT(led_index);
+	else
+		ctrl->available_leds[port_index].secondary |= BIT(led_index);
+
+	/*
+	 * On Cypress and newer, secondary LEDs can be software controlled and
+	 * have an independent hardware trigger. On Maple this is not possible.
+	 * We should not register a classdev for secondary LEDs on Maple.
+	 */
+	if (is_secondary && !ctrl->cfg->independent_secondaries)
+		return NULL;
+
+	pled = devm_kzalloc(ctrl->dev, sizeof(*pled), GFP_KERNEL);
+	if (!pled)
+		return ERR_PTR(-ENOMEM);
+
+	pled->ctrl = ctrl;
+	pled->port = port_index;
+	pled->index = led_index;
+	pled->is_secondary = is_secondary;
+
+	err = switch_port_register_classdev(pled, np);
+	if (err)
+		return ERR_PTR(err);
+
+	ctrl->cfg->set_hw_managed(pled, false);
 
 	return pled;
 }
@@ -857,7 +972,6 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	struct led_port_group *group;
 	struct switch_port_led *pled;
 	const char *mode_name;
-	u32 leds_per_port = 0;
 	int i, i_grp, i_led;
 	int err;
 
@@ -887,9 +1001,8 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	if (!ctrl->groups)
 		return -ENOMEM;
 
-	ctrl->ports_copper = devm_bitmap_zalloc(dev, ctrl->cfg->port_count, GFP_KERNEL);
-	ctrl->ports_sfp = devm_bitmap_zalloc(dev, ctrl->cfg->port_count, GFP_KERNEL);
-	if (!ctrl->ports_copper || !ctrl->ports_sfp)
+	ctrl->available_leds = devm_kcalloc(dev, ctrl->cfg->port_count, sizeof(*ctrl->available_leds), GFP_KERNEL);
+	if (!ctrl->available_leds)
 		return -ENOMEM;
 
 	for (i_grp = 0; i_grp < ctrl->cfg->group_count; i_grp++) {
@@ -929,11 +1042,15 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, -EINVAL, "realtek,output-mode invalid\n");
 
 	for_each_available_child_of_node(np, child) {
-		if (of_n_addr_cells(child) != 2 || of_n_size_cells(child) != 0) {
+		if (of_n_addr_cells(child) != 3) {
 			of_node_put(child);
-			return dev_err_probe(dev, -EINVAL,
-				"#address-cells (%d) is not 2 or #size-cells (%d) is not 0\n",
-				(u32) of_n_addr_cells(child), (u32) of_n_size_cells(child));
+			return dev_err_probe(dev, -EINVAL, "#address-cells (%d) is not 3\n",
+				(u32) of_n_addr_cells(child));
+		}
+		if (of_n_size_cells(child) != 0) {
+			of_node_put(child);
+			return dev_err_probe(dev, -EINVAL, "#size-cells (%d) is not 0\n",
+				(u32) of_n_size_cells(child));
 		}
 
 		if (!of_node_name_prefix(child, "led")) {
@@ -946,19 +1063,9 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 			dev_warn(dev, "failed to register led: %ld\n", PTR_ERR(pled));
 			continue;
 		}
-
-		if (pled->index + 1 > leds_per_port)
-			leds_per_port = pled->index + 1;
-
-		if (leds_per_port > ctrl->cfg->port_led_count) {
-			of_node_put(child);
-			return dev_err_probe(dev, -EINVAL,
-				"too many LEDs per port: %d > %d\n",
-				leds_per_port, ctrl->cfg->port_led_count);
-		}
 	}
 
-	return ctrl->cfg->port_led_init(ctrl, leds_per_port, mode);
+	return ctrl->cfg->init(ctrl, mode);
 }
 
 static const struct of_device_id of_switch_port_led_match[] = {
