@@ -116,6 +116,18 @@ struct switch_port_led_ctrl {
 	struct led_port_group *groups;
 };
 
+/* FIXME remove before submission */
+static void ctrl_dump_registers(const struct switch_port_led_ctrl *ctrl, unsigned int start, unsigned int end)
+{
+	for (unsigned int i = start; i < end; i += 16) {
+		u32 reg[4];
+		for (unsigned int j = 0; j < 4; j++)
+			regmap_read(ctrl->map, i + 4 * j, &reg[j]);
+
+		dev_info(ctrl->dev, "%04x : %08x %08x %08x %08x", i, reg[0], reg[1], reg[2], reg[3]);
+	}
+}
+
 static struct led_port_group *switch_port_led_get_group(
 	struct switch_port_led *pled, unsigned int group)
 {
@@ -427,13 +439,7 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	/* Set mode to enable output */
 	err = regmap_write(ctrl->map, RTL8380_REG_LED_MODE_SEL, mode);
 
-	for (int i = 0xa000; i < 0xa08c; i += 16) {
-		u32 reg[4];
-		for (int j = 0; j < 4; j++)
-			regmap_read(ctrl->map, i + 4 * j, &reg[j]);
-
-		dev_info(ctrl->dev, "%04x : %08x %08x %08x %08x", i, reg[0], reg[1], reg[2], reg[3]);
-	}
+	ctrl_dump_registers(ctrl, 0xa000, 0xa08c);
 
 	return err;
 }
@@ -639,13 +645,7 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 		enable | led_count_mask | output_mode_mask,
 		enable | FIELD_PREP(led_count_mask, led_count) | FIELD_PREP(output_mode_mask, mode));
 
-	for (int i = 0x00e0; i < 0x0214; i += 16) {
-		u32 reg[4];
-		for (int j = 0; j < 4; j++)
-			regmap_read(ctrl->map, i + 4 * j, &reg[j]);
-
-		dev_info(ctrl->dev, "%04x : %08x %08x %08x %08x", i, reg[0], reg[1], reg[2], reg[3]);
-	}
+	ctrl_dump_registers(ctrl, 0x00e0, 0x0214);
 
 	return err;
 }
