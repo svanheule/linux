@@ -582,10 +582,10 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	static const u32 output_mode_mask = GENMASK(1, 0);
 	static const u32 led_count_mask = GENMASK(3, 2);
 	struct switch_port_led_mask *led_mask;
-	u32 enable = BIT(5);
+	static const u32 enable = BIT(5);
 	u32 led_count = 0;
 	unsigned int port;
-	u32 pmask_val;
+	u32 pmask;
 	int err;
 
 	/* Clear {COPR,FIB}_PMASK registers to disable all LEDs */
@@ -601,7 +601,7 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 			continue;
 
 		led_count = max(led_count, (u32) fls(led_mask->primary | led_mask->secondary));
-		pmask_val = BIT(port % 32);
+		pmask = BIT(port % 32);
 
 		/*
 		 * FIXME set both bits on (primary OR secondary)?
@@ -620,25 +620,27 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 		/*
 		 * SDK will only set the COPR_PMASK bit if an RJ45 port is
 		 * present, and FIB_PMASK if an SFP cage is present.
-		 * Here instead, always trigger on both port types, but tell the
-		 * hardware there is only one LED for our (fake) combo port.
+		 * Here instead, always trigger on both port types (i.e. set
+		 * COPR_PMASK and FIB_PMASK), but tell the hardware there is
+		 * only one LED for our (fake) combo port by also setting
+		 * COMBO_CTRL.
 		 * A real combo port with one LED should thus only ever need to
 		 * specify a primary LED, consistent with the physical LED
 		 * layout.
 		 */
-		err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COPR_PMASK_CTRL(port), pmask_val, pmask_val);
+		err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COPR_PMASK_CTRL(port), pmask, pmask);
 		if (err)
 			return err;
-		err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_FIB_PMASK_CTRL(port), pmask_val, pmask_val);
+		err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_FIB_PMASK_CTRL(port), pmask, pmask);
 		if (err)
 			return err;
 
-		/* If not both primary and secondary are provided, merge LEDs */
-		if (!(led_mask->primary && led_mask->secondary)) {
-			err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COMBO_CTRL(port), pmask_val, pmask_val);
-			if (err)
-				return err;
-		}
+		if (led_mask->primary && led_mask->secondary)
+			continue;
+
+		err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COMBO_CTRL(port), pmask, pmask);
+		if (err)
+			return err;
 	}
 
 	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL,
