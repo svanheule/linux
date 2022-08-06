@@ -588,10 +588,11 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	u32 pmask;
 	int err;
 
-	/* Clear {COPR,FIB}_PMASK registers to disable all LEDs */
+	/* Clear {COPR,FIB}_PMASK and COMBO_CTRL registers to disable all LEDs */
 	for (port = 0; port < ctrl->cfg->port_count; port += 32) {
 		regmap_write(ctrl->map, RTL8390_REG_LED_COPR_PMASK_CTRL(port), 0);
 		regmap_write(ctrl->map, RTL8390_REG_LED_FIB_PMASK_CTRL(port), 0);
+		regmap_write(ctrl->map, RTL8390_REG_LED_COMBO_CTRL(port), 0);
 	}
 
 	for (port = 0; port < ctrl->cfg->port_count; port++) {
