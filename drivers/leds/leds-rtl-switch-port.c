@@ -744,20 +744,58 @@ static ssize_t rtl_hw_trigger_show(struct device *dev, struct device_attribute *
 	return sprintf(buf, "%x\n", pled->trigger_flags);
 }
 
+/*
+ * Add an LED without a current group assigment to a group.
+ * If the LED is already part of a group, call rtl_hw_trigger_leave_group()
+ * before joining the new group.
+ * To enable HW offloading, the HW trigger must be enabled separately.
+ */
+static int rtl_hw_trigger_assign(struct switch_port_led *led, int trigger)
+{
+	const struct switch_port_led_config *cfg = led->ctrl->cfg;
+	struct led_port_group *group;
+	u32 rtl_trigger;
+	int err;
+
+	rtl_trigger = cfg->trigger_xlate(led, trigger);
+	if (rtl_trigger < 0)
+		return rtl_trigger;
+
+	group = cfg->map_group(led, trigger);
+	if (IS_ERR(group))
+		return PTR_ERR(group);
+
+	if (bitmap_empty(group->ports, group->size)) {
+		err = regmap_field_write(group->setting, rtl_trigger);
+		if (err)
+			return err;
+	}
+
+	err = cfg->assign_group(led, group);
+	if (err)
+		return err;
+
+	bitmap_set(group->ports, led->port, 1);
+	led->current_group = group;
+
+	return 0;
+}
+
 static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t count)
 {
 	struct switch_port_led *pled = dev_get_drvdata(dev);
 	struct switch_port_led_ctrl *ctrl = pled->ctrl;
-	struct led_port_group *group, *new_group;
-	unsigned int member_count;
+	int err = 0;
 	int trigger;
 	int nchars;
 	int value;
-	int err;
 
 	if (sscanf(buf, "%x%n", &value, &nchars) != 1 || nchars + 1 < count)
 		return -EINVAL;
+
+	if (pled->trigger_flags == value)
+		return count;
 
 	trigger = ctrl->cfg->trigger_xlate(pled, value);
 	if (trigger < 0)
@@ -765,42 +803,19 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 
 	mutex_lock(&ctrl->lock);
 
+	if (!pled->current_group)
+		goto out;
+
 	/*
-	 * If the private trigger is already active:
-	 *   - modify the current group if we are the only member,
-	 *   - or join a new group if one is available
+	 * If rtl_hw_trigger_assign() fails, there is no state that needs to be
+	 * reverted, so the LED can be rejoined to the old group without
+	 * issues.
 	 */
-	if (pled->current_group) {
-		/* TODO Factor out the common (de)activation parts */
-		group = pled->current_group;
-
-		member_count = bitmap_weight(group->ports, group->size);
-
-		if (member_count == 1) {
-			err = regmap_field_write(group->setting, trigger);
-			if (err)
-				goto err_out;
-
-			goto out;
-		}
-
-		new_group = ctrl->cfg->map_group(pled, value);
-		if (IS_ERR(new_group)) {
-			err = PTR_ERR(new_group);
-			goto err_out;
-		}
-
-		if (member_count == 0) {
-			err = regmap_field_write(new_group->setting, trigger);
-			if (err)
-				goto err_out;
-		}
-
-		err = ctrl->cfg->assign_group(pled, new_group);
-		if (err)
-			goto err_out;
-
-		pled->current_group = new_group;
+	bitmap_clear(pled->current_group->ports, pled->port, 1);
+	err = rtl_hw_trigger_assign(pled, value);
+	if (err) {
+		bitmap_set(pled->current_group->ports, pled->port, 1);
+		goto err_out;
 	}
 
 out:
@@ -825,33 +840,13 @@ ATTRIBUTE_GROUPS(rtl_hw_trigger);
 static int switch_port_led_trigger_activate(struct led_classdev *led_cdev)
 {
 	struct switch_port_led *pled = container_of(led_cdev, struct switch_port_led, led);
-	struct led_port_group *group;
-	int rtl_trigger;
 	int err = 0;
 
 	mutex_lock(&pled->ctrl->lock);
 
-	rtl_trigger = pled->ctrl->cfg->trigger_xlate(pled, pled->trigger_flags);
-	if (rtl_trigger < 0) {
-		err = rtl_trigger;
+	err = rtl_hw_trigger_assign(pled, pled->trigger_flags);
+	if (err)
 		goto out;
-	}
-
-	group = pled->ctrl->cfg->map_group(pled, pled->trigger_flags);
-	if (IS_ERR(group)) {
-		err = PTR_ERR(group);
-		goto out;
-	}
-
-	if (bitmap_empty(group->ports, group->size)) {
-		err = regmap_field_write(group->setting, rtl_trigger);
-		if (err)
-			goto out;
-	}
-
-	bitmap_set(group->ports, pled->port, 1);
-	pled->current_group = group;
-	pled->ctrl->cfg->assign_group(pled, group);
 
 	err = pled->ctrl->cfg->set_hw_managed(pled, true);
 
@@ -864,16 +859,16 @@ out:
 static void switch_port_led_trigger_deactivate(struct led_classdev *led_cdev)
 {
 	struct switch_port_led *pled = container_of(led_cdev, struct switch_port_led, led);
-	struct led_port_group *group;
 
 	mutex_lock(&pled->ctrl->lock);
 
-	pled->ctrl->cfg->set_hw_managed(pled, false);
+	if (pled->ctrl->cfg->set_hw_managed(pled, false))
+		goto out;
 
-	group = pled->current_group;
+	bitmap_clear(pled->current_group->ports, pled->port, 1);
 	pled->current_group = NULL;
-	bitmap_clear(group->ports, pled->port, 1);
 
+out:
 	mutex_unlock(&pled->ctrl->lock);
 }
 
