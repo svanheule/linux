@@ -184,6 +184,7 @@ static int switchcore_sys_led_probe(struct realtek_switchcore_ctrl *ctrl,
 }
 
 static const struct mfd_cell rtl8380_mfd_devices[] = {
+	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,maple-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,rtl8380-port-led"),
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
@@ -200,6 +201,7 @@ static const struct realtek_switchcore_data rtl8380_switchcore_data = {
 };
 
 static const struct mfd_cell rtl8390_mfd_devices[] = {
+	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,cypress-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,rtl8390-port-led"),
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
@@ -258,17 +260,6 @@ static int realtek_switchcore_probe(struct platform_device *pdev)
 
 	if (ctrl->data->probe_model_name)
 		ctrl->data->probe_model_name(ctrl);
-
-	/* Parse optional led-sys child */
-	np_sys_led = of_get_child_by_name(np, "led-sys");
-	if (IS_ERR(np_sys_led))
-		return PTR_ERR(np_sys_led);
-
-	if (np_sys_led && of_device_is_available(np_sys_led)) {
-		err = switchcore_sys_led_probe(ctrl, np_sys_led);
-		if (err)
-			dev_warn(dev, "probing of system led failed %d\n", err);
-	}
 
 	/* Find sub-devices */
 	if (ctrl->data->mfd_devices)
