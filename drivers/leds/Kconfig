@@ -884,6 +884,9 @@ source "drivers/leds/rgb/Kconfig"
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"
 
+comment "Realtek LED drivers"
+source "drivers/leds/realtek/Kconfig"
+
 comment "Simple LED drivers"
 source "drivers/leds/simple/Kconfig"
 

@@ -109,5 +109,8 @@ obj-$(CONFIG_LEDS_TRIGGERS)		+= trigger/
 # LED Blink
 obj-y					+= blink/
 
+# Realtek LED drivers
+obj-y					+= realtek/
+
 # Simple LED drivers
 obj-y					+= simple/
