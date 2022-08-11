@@ -28,7 +28,8 @@ struct regfield_led_modes {
 	struct regfield_led_blink_mode blink[];
 };
 
-int regfield_led_probe(struct device *parent, struct fwnode *led_node, struct regmap *map,
-			struct regfield field, const struct regfield_led_modes *modes);
+int regfield_led_probe(struct device *parent, struct fwnode_handle *led_node,
+		struct regmap *map, struct reg_field field,
+		const struct regfield_led_modes *modes);
 
 #endif
