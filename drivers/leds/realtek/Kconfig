@@ -4,3 +4,15 @@ menuconfig LEDS_RTL
 	help
 	  Say Y to enable support for LED peripherals found on Realtek switch
 	  SoCs.
+
+if LEDS_RTL
+
+config LEDS_RTL_SWITCHCORE_SYSTEM
+	tristate "Realtek switch SoC system LED support"
+	depends on LEDS_CLASS
+	depends on MFD_REALTEK_SWITCHCORE || COMPILE_TEST
+	select MFD_SYSCON
+	help
+	  This option enables support for Realtek switch SoC system LEDs.
+
+endif # LED_RTL
