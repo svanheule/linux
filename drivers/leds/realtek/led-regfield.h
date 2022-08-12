@@ -12,10 +12,10 @@
  * Register field LED
  *
  * Next to being able to turn an LED on or off, Realtek provides LED management
- * peripherals with hardware accelerated blinking modes.
+ * peripherals with hardware accelerated blinking modes with 50% duty cycle.
  */
 struct regfield_led_blink_mode {
-	u16 interval; /* Toggle interval in ms */
+	u16 toggle_ms; /* Toggle interval in ms */
 	u8 mode; /* ASIC mode bits */
 };
 
@@ -24,7 +24,7 @@ struct regfield_led_modes {
 	u8 on;
 	/*
 	 * List of blink modes. Must be sorted by interval and terminated by an
-	 * entry where regfield_led_blink_mode::mode equals zero.
+	 * entry where regfield_led_blink_mode::toggle_ms equals zero.
 	 */
 	struct regfield_led_blink_mode blink[];
 };

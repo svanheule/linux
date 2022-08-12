@@ -41,20 +41,20 @@ static int regfield_led_blink_set(struct led_classdev *led_cdev, unsigned long *
 {
 	struct regfield_led *led = to_regfield_led(led_cdev);
 	const struct regfield_led_blink_mode *blink = led->modes->blink;
-	u32 interval_ms = *delay_on + *delay_off;
+	u32 cycle_ms = *delay_on + *delay_off;
 	int err;
 
-	if (!interval_ms)
-		interval_ms = 500;
+	if (!cycle_ms)
+		cycle_ms = 500;
 
-	while (blink->interval && (blink + 1)->interval) {
+	while (blink->toggle_ms && (blink + 1)->toggle_ms) {
 		/*
 		 * Split at the arithmetic mean of intervals, which compares
-		 * the half interval (interval_ms / 2) to the mean toggle
-		 * interval ((blink->interval + (blink + 1)->interval) / 2).
+		 * the half cycle interval (cycle_ms / 2) to the mean toggle
+		 * interval ((blink->toggle_ms + (blink + 1)->toggle_ms) / 2).
 		 * Since the (/ 2) is common on both sides, it can be dropped.
 		 */
-		if (interval_ms > (blink->interval + (blink + 1)->interval))
+		if (cycle_ms > (blink->toggle_ms + (blink + 1)->toggle_ms))
 			break;
 		blink++;
 	}
@@ -63,8 +63,8 @@ static int regfield_led_blink_set(struct led_classdev *led_cdev, unsigned long *
 	if (err)
 		return err;
 
-	*delay_on = blink->interval;
-	*delay_off = blink->interval;
+	*delay_on = blink->toggle_ms;
+	*delay_off = blink->toggle_ms;
 
 	return 0;
 }
