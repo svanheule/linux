@@ -1,22 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 
-#include <linux/container_of.h>
 #include <linux/leds.h>
 #include <linux/property.h>
 
 #include "led-regfield.h"
-
-struct regfield_led {
-	struct led_classdev cdev;
-	const struct regfield_led_modes *modes;
-	struct regmap_field *field;
-	bool active_low;
-};
-
-static struct regfield_led *to_regfield_led(struct led_classdev *cdev)
-{
-	return container_of(cdev, struct regfield_led, cdev);
-}
 
 static int regfield_led_set_mode(const struct regfield_led *led, unsigned int mode)
 {

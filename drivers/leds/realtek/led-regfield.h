@@ -3,6 +3,7 @@
 #ifndef LEDS_REALTEK_LED_REGFIELD_H
 #define LEDS_REALTEK_LED_REGFIELD_H
 
+#include <linux/container_of.h>
 #include <linux/device.h>
 #include <linux/fwnode.h>
 #include <linux/regmap.h>
@@ -27,6 +28,18 @@ struct regfield_led_modes {
 	 */
 	struct regfield_led_blink_mode blink[];
 };
+
+struct regfield_led {
+	struct led_classdev cdev;
+	const struct regfield_led_modes *modes;
+	struct regmap_field *field;
+	bool active_low;
+};
+
+static inline struct regfield_led *to_regfield_led(struct led_classdev *cdev)
+{
+	return container_of(cdev, struct regfield_led, cdev);
+}
 
 int regfield_led_probe(struct device *parent, struct fwnode_handle *led_node,
 		struct regmap *map, struct reg_field field,
