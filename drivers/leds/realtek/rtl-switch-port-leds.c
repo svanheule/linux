@@ -739,7 +739,8 @@ static struct led_hw_trigger_type switch_port_rtl_hw_trigger_type;
 
 static ssize_t rtl_hw_trigger_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct switch_port_led *pled = dev_get_drvdata(dev);
+	struct led_classdev cdev = dev_get_drvdata(dev);
+	struct switch_port_led *pled = container_of(cdev, struct switch_port_led, led);
 
 	return sprintf(buf, "%x\n", pled->trigger_flags);
 }
@@ -784,7 +785,8 @@ static int rtl_hw_trigger_assign(struct switch_port_led *led, int trigger)
 static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t count)
 {
-	struct switch_port_led *pled = dev_get_drvdata(dev);
+	struct led_classdev cdev = dev_get_drvdata(dev);
+	struct switch_port_led *pled = container_of(cdev, struct switch_port_led, led);
 	struct switch_port_led_ctrl *ctrl = pled->ctrl;
 	int err = 0;
 	int trigger;
@@ -882,27 +884,17 @@ static struct led_trigger switch_port_rtl_hw_trigger = {
 static int switch_port_register_classdev(struct switch_port_led *pled, struct device_node *np)
 {
 	struct led_init_data init_data = {};
-	int err;
 
 	pled->led.max_brightness = 1;
 	pled->led.brightness_set = switch_port_led_brightness_set;
 	pled->led.brightness_get = switch_port_led_brightness_get;
 	pled->led.blink_set = switch_port_led_blink_set;
 	pled->led.trigger_type = &switch_port_rtl_hw_trigger_type;
+	pled->led.groups = rtl_hw_trigger_groups;
 
 	init_data.fwnode = of_fwnode_handle(np);
 
-	err = devm_led_classdev_register_ext(pled->ctrl->dev, &pled->led, &init_data);
-	if (err)
-		return err;
-
-	err = devm_device_add_groups(pled->led.dev, rtl_hw_trigger_groups);
-	if (err)
-		return err;
-
-	dev_set_drvdata(pled->led.dev, pled);
-
-	return 0;
+	return devm_led_classdev_register_ext(pled->ctrl->dev, &pled->led, &init_data);
 }
 
 static struct switch_port_led *switch_port_led_probe_single(
