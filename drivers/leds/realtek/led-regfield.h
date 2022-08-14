@@ -6,6 +6,7 @@
 #include <linux/container_of.h>
 #include <linux/device.h>
 #include <linux/fwnode.h>
+#include <linux/leds.h>
 #include <linux/regmap.h>
 
 /*
@@ -41,8 +42,7 @@ static inline struct regfield_led *to_regfield_led(struct led_classdev *cdev)
 	return container_of(cdev, struct regfield_led, cdev);
 }
 
-int regfield_led_probe(struct device *parent, struct fwnode_handle *led_node,
-		struct regmap *map, struct reg_field field,
-		const struct regfield_led_modes *modes);
+int regfield_led_init(struct regfield_led *led, struct regmap_field *field,
+		      struct fwnode_handle *led_node, const struct regfield_led_modes *modes);
 
 #endif

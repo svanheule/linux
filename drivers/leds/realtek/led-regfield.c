@@ -69,39 +69,20 @@ static int regfield_led_blink_set(struct led_classdev *led_cdev, unsigned long *
 	return 0;
 }
 
-int regfield_led_probe(struct device *parent, struct fwnode_handle *led_node,
-			struct regmap *map, struct reg_field field,
-			const struct regfield_led_modes *modes)
+int regfield_led_init(struct regfield_led *led, struct regmap_field *field,
+		      struct fwnode_handle *fwnode, const struct regfield_led_modes *modes)
 {
-	struct led_init_data init_data = {};
-	struct regfield_led *led;
-
-	if (!parent || !led_node)
-		return -ENODEV;
-
-	if (!map)
-		return -ENXIO;
-
-	if (!modes)
+	if (IS_ERR_OR_NULL(field) || !modes)
 		return -EINVAL;
 
-	led = devm_kzalloc(parent, sizeof(*led), GFP_KERNEL);
-	if (!led)
-		return -ENOMEM;
-
-	led->field = devm_regmap_field_alloc(parent, map, field);
-	if (IS_ERR(led->field))
-		return PTR_ERR(led->field);
-
-	init_data.fwnode = led_node;
-
+	led->field = field;
 	led->modes = modes;
-	led->active_low = fwnode_property_read_bool(led_node, "active-low");
+	led->active_low = fwnode_property_read_bool(fwnode, "active-low");
 
 	led->cdev.max_brightness = 1;
 	led->cdev.brightness_set = regfield_led_brightness_set;
 	led->cdev.brightness_get = regfield_led_brightness_get;
 	led->cdev.blink_set = regfield_led_blink_set;
 
-	return devm_led_classdev_register_ext(parent, &led->cdev, &init_data);
+	return 0;
 }
