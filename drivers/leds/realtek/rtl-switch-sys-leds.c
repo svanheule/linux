@@ -53,8 +53,8 @@ static int rtl_sys_led_probe(struct platform_device *pdev)
 	struct regmap *map;
 	int err;
 
-	field = device_get_match_data(dev);
-	if (!field)
+	field_data = device_get_match_data(dev);
+	if (!field_data)
 		return dev_err_probe(dev, -EINVAL, "no reg_field data\n");
 
 	if (!np)
