@@ -14,6 +14,8 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 
+#include "led-regfield.h"
+
 /* TODO Change to tx/rx/link sysfs attributes like netdev? */
 /* Hardware independent port trigger flag list */
 #define PTRG_NONE		0
@@ -41,18 +43,6 @@ enum rtl_led_output_mode {
 	RTL_LED_OUTPUT_DISABLED		= 3,
 };
 
-struct led_port_blink_mode {
-	u16 interval; /* Toggle interval in ms */
-	u8 mode; /* ASIC mode bits */
-};
-
-#define REALTEK_PORT_LED_BLINK_COUNT	6
-struct led_port_modes {
-	u8 off;
-	u8 on;
-	struct led_port_blink_mode blink[REALTEK_PORT_LED_BLINK_COUNT];
-};
-
 struct led_port_group {
 	unsigned int index;
 	struct regmap_field *setting;
@@ -66,7 +56,7 @@ struct led_port_group {
 struct switch_port_led_ctrl;
 
 struct switch_port_led {
-	struct led_classdev led;
+	struct regfield_led led;
 	struct switch_port_led_ctrl *ctrl;
 	struct led_port_group *current_group;
 	u32 trigger_flags;
@@ -80,14 +70,15 @@ struct switch_port_led_config {
 	unsigned int port_led_count;
 	unsigned int group_count;
 	bool independent_secondaries;
-	const struct led_port_modes *modes;
+	/* Port LED reg_field */
+	const struct regfield_led_modes *modes;
+	/* TODO just pass switch_port_led *? */
+	struct reg_field (*regfield)(unsigned int port, unsigned int index);
+	void (*regfield_commit)(struct regfield_led *led);
 	/* Configure and start the peripheral */
 	int (*init)(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode);
 	/* Switch between HW offloading or user control */
 	int (*set_hw_managed)(struct switch_port_led *led, bool hw_managed);
-	/* Read/write user modes */
-	int (*write_mode)(struct switch_port_led *led, unsigned int mode);
-	int (*read_mode)(struct switch_port_led *led);
 	/* Translate a generic trigger to a gen-specific one */
 	int (*trigger_xlate)(struct switch_port_led *led, u32 trigger);
 	/*
@@ -126,6 +117,11 @@ static void ctrl_dump_registers(const struct switch_port_led_ctrl *ctrl, unsigne
 
 		dev_info(ctrl->dev, "%04x : %08x %08x %08x %08x", i, reg[0], reg[1], reg[2], reg[3]);
 	}
+}
+
+static inline struct switch_port_led *to_switch_port_led(struct led_classdev *cdev)
+{
+	return container_of(to_regfield_led(cdev), struct switch_port_led, led);
 }
 
 static struct led_port_group *switch_port_led_get_group(
@@ -171,7 +167,7 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 #define RTL8380_REG_LED_MODE_CTRL		0xa004
 #define RTL8380_REG_LED_P_EN_CTRL		0xa008
 #define RTL8380_REG_LED_SW_P_EN_CTRL(led)	(0xa010 + 4 * (led)->index)
-#define RTL8380_REG_LED_SW_CTRL(led)		(0xa01c + 4 * (led)->port)
+#define RTL8380_REG_LED_SW_CTRL(port)		(0xa01c + 4 * (port))
 
 #define RTL8380_PORT_LED_COUNT			3
 #define RTL8380_GROUP_SETTING_WIDTH		5
@@ -203,17 +199,18 @@ enum rtl83xx_port_trigger {
 	RTL83XX_TRIG_DISABLED		= 31,
 };
 
-static const struct led_port_modes rtl8380_port_led_modes = {
+static const struct regfield_led_modes rtl8380_port_led_modes = {
 	.off = 0,
 	.on = 5,
-	/* Modes 6 and 7 appear to be a late addition to the list */
+	/* Modes 6 and 7 appear to be a late additions to the list */
 	.blink  = {
 		{  32, 1},
 		{  64, 2},
 		{ 128, 3},
 		{ 256, 6},
 		{ 512, 4},
-		{1024, 7}
+		{1024, 7},
+		{ /* sentinel */ }
 	},
 };
 
@@ -326,26 +323,13 @@ static int rtl8380_port_led_set_hw_managed(struct switch_port_led *led, bool hw_
 	return regmap_update_bits(led->ctrl->map, reg, BIT(led->port), val);
 }
 
-static int rtl8380_port_led_write_mode(struct switch_port_led *led, unsigned int mode)
+static struct reg_field rtl8380_port_led_regfield(unsigned int port, unsigned int index)
 {
-	unsigned int reg = RTL8380_REG_LED_SW_CTRL(led);
-	unsigned int offset = 3 * led->index;
-	u32 mask = GENMASK(2, 0) << offset;
-	u32 value = mode << offset;
+	unsigned int reg = RTL8380_REG_LED_SW_CTRL(port);
+	unsigned int offset = 3 * index;
+	struct reg_field field = REG_FIELD(reg, offset, offset + 2);
 
-	return regmap_update_bits(led->ctrl->map, reg, mask, value);
-}
-
-static int rtl8380_port_led_read_mode(struct switch_port_led *led)
-{
-	u32 val;
-	int ret;
-
-	ret = regmap_read(led->ctrl->map, RTL8380_REG_LED_SW_CTRL(led), &val);
-	if (ret)
-		return ret;
-
-	return (val >> (3 * led->index)) & GENMASK(2, 0);
+	return field;
 }
 
 static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
@@ -450,10 +434,9 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 	.group_count = 2,
 	.independent_secondaries = false,
 	.modes = &rtl8380_port_led_modes,
+	.regfield = rtl8380_port_led_regfield,
 	.init = rtl8380_port_led_init,
 	.set_hw_managed = rtl8380_port_led_set_hw_managed,
-	.write_mode = rtl8380_port_led_write_mode,
-	.read_mode = rtl8380_port_led_read_mode,
 	.trigger_xlate = rtl8380_port_trigger_xlate,
 	.map_group = rtl8380_port_led_map_group,
 	.assign_group = rtl8380_port_led_assign_group,
@@ -491,7 +474,7 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 		.msb = RTL8390_GROUP_SETTING_SHIFT(_grp, (_idx) + 1) - 1,	\
 	}
 
-static const struct led_port_modes rtl8390_port_led_modes = {
+static const struct regfield_led_modes rtl8390_port_led_modes = {
 	.off = 0,
 	.on = 7,
 	.blink = {
@@ -500,17 +483,20 @@ static const struct led_port_modes rtl8390_port_led_modes = {
 		{ 128, 3},
 		{ 256, 4},
 		{ 512, 5},
-		{1024, 6}
+		{1024, 6},
+		{ /* sentinel */ }
 	},
 };
 
-static void rtl8390_port_commit(struct switch_port_led_ctrl *ctrl)
+static void rtl8390_port_led_commit(struct regfield_led *rled)
 {
+    const struct switch_port_led *led = container_of(rled, struct switch_port_led, led);
+
 	/*
 	 * Could trigger the latching with delayed work,
 	 * but that's probably not worth the overhead
 	 */
-	regmap_write(ctrl->map, RTL8390_REG_LED_SW_CTRL, 1);
+	regmap_write(led->ctrl->map, RTL8390_REG_LED_SW_CTRL, 1);
 }
 
 static int rtl8390_port_trigger_xlate(struct switch_port_led *led, u32 port_led_trigger)
@@ -547,34 +533,13 @@ static int rtl8390_port_led_set_hw_managed(struct switch_port_led *led, bool hw_
 	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
 }
 
-static int rtl8390_port_led_write_mode(struct switch_port_led *led, unsigned int mode)
+static struct reg_field rtl8390_port_led_regfield(unsigned int port, unsigned int index)
 {
-	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led->port);
-	unsigned int shift = led->index * 3;
-	u32 mask = GENMASK(2, 0) << shift;
-	u32 value = mode << shift;
-	int err;
+	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(port);
+	unsigned int shift = index * 3;
+	struct reg_field field = REG_FIELD(reg, shift, shift + 2);
 
-	err = regmap_update_bits(led->ctrl->map, reg, mask, value);
-	if (!err)
-		rtl8390_port_commit(led->ctrl);
-
-	return err;
-}
-
-static int rtl8390_port_led_read_mode(struct switch_port_led *led)
-{
-	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(led->port);
-	unsigned int shift = led->index * 3;
-	u32 val;
-	int err;
-
-	err = regmap_read(led->ctrl->map, reg, &val);
-	if (err)
-		return err;
-
-	/* FIXME FIELD_GET */
-	return (val >> shift) & GENMASK(2, 0);
+	return field;
 }
 
 static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
@@ -659,10 +624,10 @@ static const struct switch_port_led_config rtl8390_port_led_config = {
 	.group_count = 4,
 	.independent_secondaries = true,
 	.modes = &rtl8390_port_led_modes,
+	.regfield = rtl8390_port_led_regfield,
+	.regfield_commit = rtl8390_port_led_commit,
 	.init = rtl8390_port_led_init,
 	.set_hw_managed = rtl8390_port_led_set_hw_managed,
-	.write_mode = rtl8390_port_led_write_mode,
-	.read_mode = rtl8390_port_led_read_mode,
 	.trigger_xlate = rtl8390_port_trigger_xlate,
 	.map_group = rtl_generic_port_led_map_group,
 	.assign_group = rtl8390_port_led_assign_group,
@@ -683,64 +648,14 @@ static const struct switch_port_led_config rtl8390_port_led_config = {
 };
 
 /*
- * Led subsystem interface
+ * Custom LED trigger interface
  */
-static void switch_port_led_brightness_set(struct led_classdev *led_cdev,
-	enum led_brightness brightness)
-{
-	struct switch_port_led *pled = container_of(led_cdev, struct switch_port_led, led);
-	struct switch_port_led_ctrl *ctrl = pled->ctrl;
-
-	ctrl->cfg->write_mode(pled, brightness ? ctrl->cfg->modes->on : ctrl->cfg->modes->off);
-}
-
-static enum led_brightness switch_port_led_brightness_get(struct led_classdev *led_cdev)
-{
-	struct switch_port_led *pled = container_of(led_cdev, struct switch_port_led, led);
-	struct switch_port_led_ctrl *ctrl = pled->ctrl;
-
-	return ctrl->cfg->read_mode(pled) != ctrl->cfg->modes->off;
-}
-
-static int switch_port_led_blink_set(struct led_classdev *led_cdev,
-	unsigned long *delay_on, unsigned long *delay_off)
-{
-	struct switch_port_led *pled = container_of(led_cdev, struct switch_port_led, led);
-	struct switch_port_led_ctrl *ctrl = pled->ctrl;
-
-	const struct led_port_blink_mode *blink = &ctrl->cfg->modes->blink[0];
-	unsigned long interval_ms = *delay_on + *delay_off;
-	unsigned int i = 0;
-
-	if (interval_ms && *delay_on == 0)
-		return ctrl->cfg->write_mode(pled, ctrl->cfg->modes->off);
-
-	if (interval_ms && *delay_off == 0)
-		return ctrl->cfg->write_mode(pled, ctrl->cfg->modes->on);
-
-	if (!interval_ms)
-		interval_ms = 500;
-
-	/*
-	 * Since the modes always double in interval, the geometric mean of
-	 * intervals [i] and [i + 1] is equal to sqrt(2) * interval[i]
-	 */
-	while (i < (REALTEK_PORT_LED_BLINK_COUNT - 1) &&
-		interval_ms > (2 * 141 * blink[i].interval) / 100)
-		i++;
-
-	*delay_on = blink[i].interval;
-	*delay_off = blink[i].interval;
-
-	return ctrl->cfg->write_mode(pled, blink[i].mode);
-}
-
 static struct led_hw_trigger_type switch_port_rtl_hw_trigger_type;
 
 static ssize_t rtl_hw_trigger_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct led_classdev cdev = dev_get_drvdata(dev);
-	struct switch_port_led *pled = container_of(cdev, struct switch_port_led, led);
+	struct led_classdev *cdev = dev_get_drvdata(dev);
+	struct switch_port_led *pled = to_switch_port_led(cdev);
 
 	return sprintf(buf, "%x\n", pled->trigger_flags);
 }
@@ -785,8 +700,8 @@ static int rtl_hw_trigger_assign(struct switch_port_led *led, int trigger)
 static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t count)
 {
-	struct led_classdev cdev = dev_get_drvdata(dev);
-	struct switch_port_led *pled = container_of(cdev, struct switch_port_led, led);
+	struct led_classdev *cdev = dev_get_drvdata(dev);
+	struct switch_port_led *pled = to_switch_port_led(cdev);
 	struct switch_port_led_ctrl *ctrl = pled->ctrl;
 	int err = 0;
 	int trigger;
@@ -841,7 +756,7 @@ ATTRIBUTE_GROUPS(rtl_hw_trigger);
 
 static int switch_port_led_trigger_activate(struct led_classdev *led_cdev)
 {
-	struct switch_port_led *pled = container_of(led_cdev, struct switch_port_led, led);
+	struct switch_port_led *pled = to_switch_port_led(led_cdev);
 	int err = 0;
 
 	mutex_lock(&pled->ctrl->lock);
@@ -860,7 +775,7 @@ out:
 
 static void switch_port_led_trigger_deactivate(struct led_classdev *led_cdev)
 {
-	struct switch_port_led *pled = container_of(led_cdev, struct switch_port_led, led);
+	struct switch_port_led *pled = to_switch_port_led(led_cdev);
 
 	mutex_lock(&pled->ctrl->lock);
 
@@ -881,20 +796,25 @@ static struct led_trigger switch_port_rtl_hw_trigger = {
 	.trigger_type = &switch_port_rtl_hw_trigger_type,
 };
 
-static int switch_port_register_classdev(struct switch_port_led *pled, struct device_node *np)
+static int switch_port_register_classdev(struct switch_port_led *pled, struct fwnode_handle *fwnode)
 {
 	struct led_init_data init_data = {};
+	struct regmap_field *field;
 
-	pled->led.max_brightness = 1;
-	pled->led.brightness_set = switch_port_led_brightness_set;
-	pled->led.brightness_get = switch_port_led_brightness_get;
-	pled->led.blink_set = switch_port_led_blink_set;
-	pled->led.trigger_type = &switch_port_rtl_hw_trigger_type;
-	pled->led.groups = rtl_hw_trigger_groups;
+	field = devm_regmap_field_alloc(pled->ctrl->dev, pled->ctrl->map,
+			pled->ctrl->cfg->regfield(pled->port, pled->index));
+	if (IS_ERR(field))
+		return PTR_ERR(field);
 
-	init_data.fwnode = of_fwnode_handle(np);
+	regfield_led_init(&pled->led, field, fwnode, pled->ctrl->cfg->modes);
 
-	return devm_led_classdev_register_ext(pled->ctrl->dev, &pled->led, &init_data);
+	pled->led.commit = pled->ctrl->cfg->regfield_commit;
+	pled->led.cdev.trigger_type = &switch_port_rtl_hw_trigger_type;
+	pled->led.cdev.groups = rtl_hw_trigger_groups;
+
+	init_data.fwnode = fwnode;
+
+	return devm_led_classdev_register_ext(pled->ctrl->dev, &pled->led.cdev, &init_data);
 }
 
 static struct switch_port_led *switch_port_led_probe_single(
@@ -948,7 +868,7 @@ static struct switch_port_led *switch_port_led_probe_single(
 	pled->index = led_index;
 	pled->is_secondary = is_secondary;
 
-	err = switch_port_register_classdev(pled, np);
+	err = switch_port_register_classdev(pled, of_fwnode_handle(np));
 	if (err)
 		return ERR_PTR(err);
 
