@@ -58,7 +58,7 @@ static int regfield_led_blink_set(struct led_classdev *led_cdev, unsigned long *
 		 * interval ((blink->toggle_ms + (blink + 1)->toggle_ms) / 2).
 		 * Since the (/ 2) is common on both sides, it can be dropped.
 		 */
-		if (cycle_ms > (blink->toggle_ms + (blink + 1)->toggle_ms))
+		if (cycle_ms < (blink->toggle_ms + (blink + 1)->toggle_ms))
 			break;
 		blink++;
 	}
