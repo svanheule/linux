@@ -5,9 +5,13 @@
 
 #include "led-regfield.h"
 
-static int regfield_led_set_mode(const struct regfield_led *led, unsigned int mode)
+static int regfield_led_set_mode(struct regfield_led *led, unsigned int mode)
 {
-	return regmap_field_write(led->field, mode);
+	int err = regmap_field_write(led->field, mode);
+	if (!err && led->commit)
+		led->commit(led);
+
+	return err;
 }
 
 static void regfield_led_brightness_set(struct led_classdev *led_cdev,

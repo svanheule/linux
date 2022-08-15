@@ -34,6 +34,7 @@ struct regfield_led {
 	struct led_classdev cdev;
 	const struct regfield_led_modes *modes;
 	struct regmap_field *field;
+	void (*commit)(struct regfield_led *led);
 	bool active_low;
 };
 
