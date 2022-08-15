@@ -85,8 +85,8 @@ static struct platform_driver rtl_sys_led_driver = {
 	.probe = rtl_sys_led_probe,
 	.driver = {
 		.name = "realtek-sys-led",
-		.of_match_table = of_rtl_sys_led_match
-	}
+		.of_match_table = of_rtl_sys_led_match,
+	},
 };
 module_platform_driver(rtl_sys_led_driver);
 
