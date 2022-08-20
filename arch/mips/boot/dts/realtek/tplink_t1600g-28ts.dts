@@ -1,0 +1,177 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl83xx.dtsi"
+#include "rtl838x.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+#define PORT_LED_AMBER(_e, _p, _l)		\
+	led@##_p##.##_l {			\
+		reg = <##_p _l>;			\
+		function = LED_FUNCTION_LAN;	\
+		color = <LED_COLOR_ID_AMBER>;	\
+		function-enumerator = <##_e##>;	\
+	}
+#define PORT_LED_GREEN(_e, _p, _l)		\
+	led@##_p##.##_l {			\
+		reg = <##_p _l>;			\
+		function = LED_FUNCTION_LAN;	\
+		color = <LED_COLOR_ID_GREEN>;	\
+		function-enumerator = <##_e##>;	\
+	}
+
+/ {
+	compatible = "tplink,g1600t-28ts-v3", "realtek,rtl83xx-soc";
+	model = "TP-Link G1600T-28TSv3";
+
+	chosen {
+		stdout-path = "serial0";
+		bootargs = "earlycon console=ttyS0,38400";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+
+	aliases {
+		mdio-gpio1 = &mdio1;
+	};
+
+	mdio1: mdio {
+		compatible = "virtual,mdio-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
+			<&gpio0 3 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_mdx_pins>;
+
+//		reset-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+//		reset-delay-us = <1000>;
+//		reset-post-delay-us = <10000>;
+
+		gpio1: expander@0 {
+			compatible = "realtek,rtl8231", "syscon";
+			reg = <0x0>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+
+//			pinctrl-names = "default";
+//			pinctrl-0 = <&led_pin_cfg>;
+//
+//			led_pin_cfg: led_pins {
+//				grp_a_pins {
+//					pins = "gpio0", "gpio1", "gpio2", "gpio3", "gpio4",
+//						"gpio5", "gpio6", "gpio7", "gpio8", "gpio9",
+//						"gpio10", "gpio11";
+//					function = "led";
+//				};
+//				grp_b_pins {
+//					pins = "gpio12", "gpio13", "gpio15", "gpio16", "gpio17",
+//						"gpio18", "gpio19", "gpio20", "gpio21", "gpio22";
+//					function = "led";
+//				};
+//			};
+
+			leds {
+				compatible = "realtek,rtl8231-leds";
+				#address-cells = <2>;
+				#size-cells = <0>;
+
+				realtek,led-scan-mode = "single-color";
+
+				PORT_LED_AMBER(0,0,0);
+				PORT_LED_AMBER(1,1,0);
+				PORT_LED_AMBER(2,2,0);
+				PORT_LED_AMBER(3,3,0);
+				PORT_LED_AMBER(4,4,0);
+				PORT_LED_AMBER(5,5,0);
+				PORT_LED_AMBER(6,6,0);
+				PORT_LED_AMBER(7,7,0);
+				PORT_LED_AMBER(8,8,0);
+				PORT_LED_AMBER(9,9,0);
+				PORT_LED_AMBER(10,10,0);
+				PORT_LED_AMBER(11,11,0);
+				PORT_LED_AMBER(12,12,0);
+				PORT_LED_AMBER(13,13,0);
+				PORT_LED_AMBER(14,14,0);
+				PORT_LED_AMBER(15,15,0);
+				PORT_LED_AMBER(16,16,0);
+				PORT_LED_AMBER(17,17,0);
+				PORT_LED_AMBER(18,18,0);
+				PORT_LED_AMBER(19,19,0);
+				PORT_LED_AMBER(20,20,0);
+				PORT_LED_AMBER(21,21,0);
+				PORT_LED_AMBER(22,22,0);
+				PORT_LED_AMBER(23,23,0);
+				PORT_LED_AMBER(24,0,2);
+				PORT_LED_AMBER(25,1,2);
+				PORT_LED_AMBER(26,2,2);
+				PORT_LED_AMBER(27,3,2);
+				PORT_LED_AMBER(28,4,2);
+				PORT_LED_AMBER(29,5,2);
+				PORT_LED_GREEN(0,0,1);
+				PORT_LED_GREEN(1,1,1);
+				PORT_LED_GREEN(2,2,1);
+				PORT_LED_GREEN(3,3,1);
+				PORT_LED_GREEN(4,4,1);
+				PORT_LED_GREEN(5,5,1);
+				PORT_LED_GREEN(6,6,1);
+				PORT_LED_GREEN(7,7,1);
+				PORT_LED_GREEN(8,8,1);
+				PORT_LED_GREEN(9,9,1);
+				PORT_LED_GREEN(10,10,1);
+				PORT_LED_GREEN(11,11,1);
+				PORT_LED_GREEN(12,12,1);
+				PORT_LED_GREEN(13,13,1);
+				PORT_LED_GREEN(14,14,1);
+				PORT_LED_GREEN(15,15,1);
+				PORT_LED_GREEN(16,16,1);
+				PORT_LED_GREEN(17,17,1);
+				PORT_LED_GREEN(18,18,1);
+				PORT_LED_GREEN(19,19,1);
+				PORT_LED_GREEN(20,20,1);
+				PORT_LED_GREEN(21,21,1);
+				PORT_LED_GREEN(22,22,1);
+				PORT_LED_GREEN(23,23,1);
+				PORT_LED_GREEN(24,6,2);
+				PORT_LED_GREEN(25,7,2);
+				PORT_LED_GREEN(26,8,2);
+				PORT_LED_GREEN(27,9,2);
+				PORT_LED_GREEN(28,10,2);
+				PORT_LED_GREEN(29,11,2);
+			};
+		};
+	};
+
+	switchcore@1b000000 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x1b000000 0x20000>;
+
+		pinctrl_gpio: pinmux@a0e0 {
+			compatible = "pinctrl-single";
+			reg = <0xa0e0 0x4>;
+
+			pinctrl-single,bit-per-mux;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0x1>;
+			#pinctrl-cells = <2>;
+
+			gpio_mdx_pins: pinmux_gpio_mdx_pins {
+				pinctrl-single,bits = <0x0 0x0 0x1>;
+			};
+		};
+	};
+};
+
+&serial0 {
+	status = "okay";
+};
