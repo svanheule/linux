@@ -1,0 +1,231 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR BSD-2-Clause
+
+/dts-v1/;
+
+#include "rtl83xx.dtsi"
+#include "rtl838x.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/leds/common.h>
+
+#define POE_LED(idx, gpio) led-##idx {\
+	gpios = <&gpio1 gpio GPIO_ACTIVE_HIGH>;\
+	color = <LED_COLOR_ID_AMBER>;\
+	function = LED_FUNCTION_STATUS;\
+	function-enumerator = <##idx>;\
+}
+
+/ {
+	model = "Ubiquiti Unifi Switch Lite 16 PoE";
+	compatible = "ubnt,usw-lite-16-poe", "realtek,rtl8382-soc";
+
+	chosen {
+		stdout-path = "serial0";
+		bootargs = "earlycon console=ttyS0,115200";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+
+//		test {
+//			gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+//			linux,code = <KEY_STOP>;
+//		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		POE_LED(0, 1);
+		POE_LED(1, 0);
+		POE_LED(2, 3);
+		POE_LED(3, 2);
+		POE_LED(4, 5);
+		POE_LED(5, 4);
+		POE_LED(6, 7);
+		POE_LED(7, 6);
+
+		led-8 {
+			gpios = <&gpio2 8 GPIO_ACTIVE_HIGH>;
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_WHITE>;
+		};
+
+		led-9 {
+			gpios = <&gpio2 9 GPIO_ACTIVE_HIGH>;
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_BLUE>;
+		};
+	};
+
+	/* Bus 0: PoE, GPIO, sensors */
+	i2c-gpio {
+		compatible = "i2c-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		scl-gpios = <&gpio0 2 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		sda-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+
+//		poe@20 {
+//			compatible = /* TODO */
+//			reg = <0x20>;
+//			/* Currenty implemented as a gpio hog */
+//			enable-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
+//			/* From PoE daughter board */
+//			alarm-gpios = <&gpio2 13 GPIO_ACTIVE_HIGH>;
+//		};
+
+		gpio1: gpio@22 {
+			compatible = "nxp,pca9555";
+			reg = <0x22>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+
+			interrupt-parent = <&gpio2>;
+			interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		gpio2: gpio@25 {
+			compatible = "nxp,pca9555";
+			reg = <0x25>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+
+			interrupt-parent = <&gpio0>;
+			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+
+			poe-enable {
+				gpio-hog;
+				gpios = <10 GPIO_ACTIVE_HIGH>;
+				output-low;
+				line-name = "poe-enable";
+			};
+		};
+
+		thermal_soc: sensor@48 {
+			compatible = "national,lm75a";
+			reg = <0x48>;
+			#thermal-sensor-cells= <0>;
+		};
+
+		thermal_phy: sensor@49 {
+			compatible = "national,lm75a";
+			reg = <0x49>;
+			#thermal-sensor-cells= <0>;
+		};
+	};
+
+
+	/* Bus 1 (empty?) */
+//	i2c-gpio-aux {
+//		compatible = "i2c-gpio";
+//		#address-cells = <1>;
+//		#size-cells = <0>;
+//		scl-gpios = <&gpio0 12 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+//		sda-gpios = <&gpio0 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+//	};
+
+	thermal-zones {
+		soc-thermal {
+			polling-delay-passive = <250>;
+			polling-delay = <1000>;
+			thermal-sensors = <&thermal_soc>;
+
+			trips {
+				soc_alert: trip-point-0 {
+					temperature = <65000>;
+					hysteresis = <2000>;
+					type = "hot";
+				};
+
+				soc_critical: trip-point-1 {
+					temperature = <75000>;
+					hysteresis = <2000>;
+					type = "critical";
+				};
+			};
+		};
+
+		phy-thermal {
+			polling-delay-passive = <250>;
+			polling-delay = <1000>;
+			thermal-sensors = <&thermal_phy>;
+
+			trips {
+				phy_alert: trip-point-0 {
+					temperature = <65000>;
+					hysteresis = <2000>;
+					type = "hot";
+				};
+
+				phy_critical: trip-point-1 {
+					temperature = <75000>;
+					hysteresis = <2000>;
+					type = "critical";
+				};
+			};
+		};
+	};
+
+	switchcore@1b000000 {
+		compatible = "syscon", "simple-mfd";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x1b000000 0x20000>;
+
+		pinctrl_sysled: pinmux@a000 {
+			compatible = "pinctrl-single";
+			reg = <0xa000 0x4>;
+
+			pinctrl-single,bit-per-mux;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0x1>;
+			#pinctrl-cells = <2>;
+
+			sys_led_pins: pinmux_sys_led_pins {
+				pinctrl-single,bits = <0x0 0x0000 0x8000>;
+			};
+		};
+
+		pinctrl_gpio: pinmux@a0e0 {
+			compatible = "pinctrl-single";
+			reg = <0xa0e0 0x4>;
+
+			pinctrl-single,bit-per-mux;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0x1>;
+			#pinctrl-cells = <2>;
+
+			gpio_mdx_pins: pinmux_gpio_mdx_pins {
+				pinctrl-single,bits = <0x0 0x0 0x1>;
+			};
+		};
+	};
+};
+
+&gpio0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&gpio_mdx_pins>, <&sys_led_pins>;
+};
+
+&serial0 {
+	status = "okay";
+};
