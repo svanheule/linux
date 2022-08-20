@@ -1,0 +1,289 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl83xx.dtsi"
+#include "rtl839x.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+#define ZYXEL_PORT_LED(phy) \
+	led@##phy##.0 { \
+		reg = <##phy 0>; \
+		realtek,hardware-managed; \
+	}
+
+/ {
+	compatible = "zyxel,gs1900-48", "realtek,rtl8393-soc";
+	model = "ZyXEL GS1900-48";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "earlycon console=ttyS0,115200";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+
+	aliases {
+		led-boot = &led_sys;
+		led-failsafe = &led_sys;
+		led-running = &led_sys;
+		led-upgrade = &led_sys;
+		mdio-gpio1 = &mdio1;
+	};
+
+//	leds {
+//		compatible = "gpio-leds";
+//
+//		pinctrl-names = "default";
+//		pinctrl-0 = <&sys_led_pins>;
+//
+//		led_sys: led-0 {
+//			gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+//			color = <LED_COLOR_ID_GREEN>;
+//			function = LED_FUNCTION_STATUS;
+//			linux,default-trigger = "default-on";
+//		};
+//	};
+
+	keys {
+		compatible = "gpio-keys-polled";
+		poll-interval = <10>;
+		debounce-interval = <50>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&input_pin_cfg>;
+
+		reset {
+			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+//	keys {
+//		compatible = "gpio-keys";
+//
+//		pinctrl-names = "default";
+//		pinctrl-0 = <&jtag_pins>;
+//
+//		fake_reset {
+//			gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+//			linux,code = <KEY_RESTART>;
+//		};
+//	};
+
+//	gpio-restart {
+//		compatible = "gpio-restart";
+//		gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+//		open-source;
+//	};
+
+	i2c-sfp0 {
+		compatible = "i2c-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		scl-gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
+		sda-gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
+		i2c-gpio,scl-open-drain;
+		i2c-gpio,sda-open-drain;
+	};
+
+	i2c-sfp1 {
+		compatible = "i2c-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		scl-gpios = <&gpio1 31 GPIO_ACTIVE_HIGH>;
+		sda-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
+		i2c-gpio,scl-open-drain;
+		i2c-gpio,sda-open-drain;
+	};
+
+	mdio1: mdio {
+		compatible = "virtual,mdio-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>,
+			<&gpio0 3 GPIO_ACTIVE_HIGH>;
+
+//		pinctrl-names = "default";
+//		pinctrl-0 = <&gpio_mdx_pins>;
+
+		reset-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+		reset-delay-us = <1000>;
+		reset-post-delay-us = <10000>;
+
+		gpio1: expander@3 {
+			compatible = "realtek,rtl8231";
+			reg = <0x3>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+			gpio-ranges = <&gpio1 0 0 37>;
+
+			led-controller {
+				compatible = "realtek,rtl8231-leds";
+				#address-cells = <2>;
+				#size-cells = <0>;
+				status = "disabled";
+			};
+
+			input_pin_cfg: input-pins {
+				gpio_pins {
+					pins = "gpio3";
+					function = "gpio";
+				};
+			};
+		};
+	};
+
+	switchcore-bus@1b000000 {
+		compatible = "realtek,rtl8390-switchcore", "syscon";
+		reg = <0x1b000000 0x10000>;
+
+		led_sys: led-sys {
+			compatible = "realtek,cypress-sys-led";
+			//status = "disabled";
+
+			function = "status";
+			color = <LED_COLOR_ID_GREEN>;
+			linux,default-trigger = "default-on";
+		};
+
+		pinctrl {
+			compatible = "realtek,rtl8390-pinctrl";
+
+			sys_led_pins: sys-led-mux {
+				groups = "sys-led";
+				function = "gpio";
+			};
+
+			gpio_mdx_pins: aux-mdio-mux {
+				groups = "aux-mdio";
+				function = "gpio";
+			};
+		};
+
+#define STR_(x) #x
+#define STR(x, y)	STR_( ## x ## y ## )
+#define PORT_LED(phy)	led@ ## phy ## .0 {\
+		reg = <(phy) 0 0>;\
+		label = STR(lan, phy) ;\
+	}
+
+		port-leds {
+			compatible = "realtek,rtl8390-port-led";
+			#address-cells = <3>;
+			#size-cells = <0>;
+
+			realtek,output-mode = "single-color-scan";
+
+			PORT_LED(0);
+			PORT_LED(1);
+			PORT_LED(2);
+			PORT_LED(3);
+			PORT_LED(4);
+			PORT_LED(5);
+			PORT_LED(6);
+			PORT_LED(7);
+			PORT_LED(8);
+			PORT_LED(9);
+			PORT_LED(10);
+			PORT_LED(11);
+			PORT_LED(12);
+			PORT_LED(13);
+			PORT_LED(14);
+			PORT_LED(15);
+			PORT_LED(16);
+			PORT_LED(17);
+			PORT_LED(18);
+			PORT_LED(19);
+			PORT_LED(20);
+			PORT_LED(21);
+			PORT_LED(22);
+			PORT_LED(23);
+			PORT_LED(24);
+			PORT_LED(25);
+			PORT_LED(26);
+			PORT_LED(27);
+			PORT_LED(28);
+			PORT_LED(29);
+			PORT_LED(30);
+			PORT_LED(31);
+			PORT_LED(32);
+			PORT_LED(33);
+			PORT_LED(34);
+			PORT_LED(35);
+			PORT_LED(36);
+			PORT_LED(37);
+			PORT_LED(38);
+			PORT_LED(39);
+			PORT_LED(40);
+			PORT_LED(41);
+			PORT_LED(42);
+			PORT_LED(43);
+			PORT_LED(44);
+			PORT_LED(45);
+			PORT_LED(46);
+			PORT_LED(47);
+			PORT_LED(48);
+			PORT_LED(49);
+		};
+	};
+
+//	switchcore-bus@1b000000 {
+//		compatible = "simple-bus";
+//		#address-cells = <1>;
+//		#size-cells = <1>;
+//		ranges = <0x0 0x1b000000 0x20000>;
+//
+//		pinctrl_jtag: pinmux@4 {
+//			compatible = "pinctrl-single";
+//			reg = <0x0004 0x4>;
+//
+//			pinctrl-single,bit-per-mux;
+//			pinctrl-single,register-width = <32>;
+//			pinctrl-single,function-mask = <0x1>;
+//			#pinctrl-cells = <2>;
+//
+//			jtag_pins: pinmux_jtag_pins {
+//				pinctrl-single,bits = <0x0 0x0002 0x0003>;
+//			};
+//		};
+//
+//		pinctrl_sysled: pinmux@e4 {
+//			compatible = "pinctrl-single";
+//			reg = <0x00e4 0x4>;
+//
+//			pinctrl-single,bit-per-mux;
+//			pinctrl-single,register-width = <32>;
+//			pinctrl-single,function-mask = <0x1>;
+//			#pinctrl-cells = <2>;
+//
+//			sys_led_pins: pinmux_sys_led_pins {
+//				pinctrl-single,bits = <0x0 0x0000 0x4000>;
+//			};
+//		};
+//
+//		pinctrl_gpio: pinmux@a0e0 {
+//			compatible = "pinctrl-single";
+//			reg = <0xa0e0 0x4>;
+//
+//			pinctrl-single,bit-per-mux;
+//			pinctrl-single,register-width = <32>;
+//			pinctrl-single,function-mask = <0x1>;
+//			#pinctrl-cells = <2>;
+//
+//			gpio_mdx_pins: pinmux_gpio_mdx_pins {
+//				pinctrl-single,bits = <0x0 0x0 0x1>;
+//			};
+//		};
+//	};
+};
+
+&serial0 {
+	status = "okay";
+};
