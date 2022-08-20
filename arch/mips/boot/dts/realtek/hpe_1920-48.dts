@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl83xx.dtsi"
+#include "rtl839x.dtsi"
+
+/ {
+	compatible = "hpe,1920-48", "realtek,rtl83xx-soc";
+	model = "HPE 1920-48 (JG927A)";
+
+	chosen {
+		stdout-path = "serial0";
+		bootargs = "earlycon console=ttyS0,38400";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+};
+
+&serial0 {
+	status = "okay";
+};
