@@ -73,8 +73,8 @@ struct switch_port_led_config {
 	/* Port LED reg_field */
 	const struct regfield_led_modes *modes;
 	/* TODO just pass switch_port_led *? */
-	struct reg_field (*regfield)(unsigned int port, unsigned int index);
-	void (*regfield_commit)(struct regfield_led *led);
+	struct reg_field (*led_regfield)(unsigned int port, unsigned int index);
+	void (*led_commit)(struct regfield_led *led);
 	/* Configure and start the peripheral */
 	int (*init)(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode);
 	/* Switch between HW offloading or user control */
@@ -434,7 +434,7 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 	.group_count = 2,
 	.independent_secondaries = false,
 	.modes = &rtl8380_port_led_modes,
-	.regfield = rtl8380_port_led_regfield,
+	.led_regfield = rtl8380_port_led_regfield,
 	.init = rtl8380_port_led_init,
 	.set_hw_managed = rtl8380_port_led_set_hw_managed,
 	.trigger_xlate = rtl8380_port_trigger_xlate,
@@ -624,8 +624,8 @@ static const struct switch_port_led_config rtl8390_port_led_config = {
 	.group_count = 4,
 	.independent_secondaries = true,
 	.modes = &rtl8390_port_led_modes,
-	.regfield = rtl8390_port_led_regfield,
-	.regfield_commit = rtl8390_port_led_commit,
+	.led_regfield = rtl8390_port_led_regfield,
+	.led_commit = rtl8390_port_led_commit,
 	.init = rtl8390_port_led_init,
 	.set_hw_managed = rtl8390_port_led_set_hw_managed,
 	.trigger_xlate = rtl8390_port_trigger_xlate,
@@ -802,13 +802,13 @@ static int switch_port_register_classdev(struct switch_port_led *pled, struct fw
 	struct regmap_field *field;
 
 	field = devm_regmap_field_alloc(pled->ctrl->dev, pled->ctrl->map,
-			pled->ctrl->cfg->regfield(pled->port, pled->index));
+			pled->ctrl->cfg->led_regfield(pled->port, pled->index));
 	if (IS_ERR(field))
 		return PTR_ERR(field);
 
 	regfield_led_init(&pled->led, field, fwnode, pled->ctrl->cfg->modes);
 
-	pled->led.commit = pled->ctrl->cfg->regfield_commit;
+	pled->led.commit = pled->ctrl->cfg->led_commit;
 	pled->led.cdev.trigger_type = &switch_port_rtl_hw_trigger_type;
 	pled->led.cdev.groups = rtl_hw_trigger_groups;
 
