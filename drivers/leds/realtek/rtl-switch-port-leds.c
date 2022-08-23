@@ -74,6 +74,7 @@ struct switch_port_led_config {
 	const struct regfield_led_modes *modes;
 	/* TODO just pass switch_port_led *? */
 	struct reg_field (*led_regfield)(unsigned int port, unsigned int index);
+	struct reg_field (*group_regfield)(unsigned int group, unsigned int index);
 	void (*led_commit)(struct regfield_led *led);
 	/* Configure and start the peripheral */
 	int (*init)(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode);
@@ -89,7 +90,6 @@ struct switch_port_led_config {
 	struct led_port_group *(*map_group)(struct switch_port_led *led, u32 trigger);
 	/* Configure the LED for HW offloading according to the provided group settings */
 	int (*assign_group)(struct switch_port_led *led, struct led_port_group *group);
-	struct reg_field group_settings[];
 };
 
 struct switch_port_led_mask {
@@ -173,11 +173,6 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 #define RTL8380_GROUP_SETTING_WIDTH		5
 #define RTL8380_GROUP_SETTING_SHIFT(grp, idx)	\
 	(RTL8380_GROUP_SETTING_WIDTH * ((idx) + RTL8380_PORT_LED_COUNT * (grp)))
-#define RTL8380_GROUP_SETTING(grp, idx)	{				\
-		.reg = RTL8380_REG_LED_MODE_CTRL,			\
-		.lsb = RTL8380_GROUP_SETTING_SHIFT(grp, idx),		\
-		.msb = RTL8380_GROUP_SETTING_SHIFT(grp, (idx) + 1) - 1,	\
-	}
 
 enum rtl83xx_port_trigger {
 	RTL83XX_TRIG_LINK_ACT		= 0,
@@ -332,6 +327,14 @@ static struct reg_field rtl8380_port_led_regfield(unsigned int port, unsigned in
 	return field;
 }
 
+static struct reg_field rtl8380_port_led_group_regfield(unsigned int group, unsigned int index)
+{
+	unsigned int reg = RTL8380_REG_LED_MODE_CTRL;
+	unsigned int shift = RTL8380_GROUP_SETTING_SHIFT(group, index);
+
+	return (struct reg_field) REG_FIELD(reg, shift, shift + RTL8380_GROUP_SETTING_WIDTH - 1);
+}
+
 static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
 {
 	const struct switch_port_led_mask *led_masks;
@@ -435,19 +438,12 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 	.independent_secondaries = false,
 	.modes = &rtl8380_port_led_modes,
 	.led_regfield = rtl8380_port_led_regfield,
+	.group_regfield = rtl8380_port_led_group_regfield,
 	.init = rtl8380_port_led_init,
 	.set_hw_managed = rtl8380_port_led_set_hw_managed,
 	.trigger_xlate = rtl8380_port_trigger_xlate,
 	.map_group = rtl8380_port_led_map_group,
 	.assign_group = rtl8380_port_led_assign_group,
-	.group_settings = {
-		RTL8380_GROUP_SETTING(0, 0),
-		RTL8380_GROUP_SETTING(0, 1),
-		RTL8380_GROUP_SETTING(0, 2),
-		RTL8380_GROUP_SETTING(1, 0),
-		RTL8380_GROUP_SETTING(1, 1),
-		RTL8380_GROUP_SETTING(1, 2),
-	},
 };
 
 /*
@@ -458,21 +454,16 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 #define RTL8390_REG_LED_FIB_SET_SEL_CTRL(port)	(0x0100 + 4 * ((port) / 16))
 #define RTL8390_REG_LED_COPR_PMASK_CTRL(port)	(0x0110 + 4 * ((port) / 32))
 #define RTL8390_REG_LED_FIB_PMASK_CTRL(port)	(0x0118 + 4 * ((port) / 32))
-#define RTL8390_REG_LED_COMBO_CTRL(port)		(0x0120 + 4 * ((port) / 32))
+#define RTL8390_REG_LED_COMBO_CTRL(port)	(0x0120 + 4 * ((port) / 32))
 #define RTL8390_REG_LED_SW_CTRL			0x0128
 #define RTL8390_REG_LED_SW_P_EN_CTRL(port)	(0x012c + 4 * ((port) / 10))
 #define RTL8390_REG_LED_SW_P_CTRL(port)		(0x0144 + 4 * (port))
 
 #define RTL8390_PORT_LED_COUNT			3
 #define RTL8390_GROUP_SETTING_WIDTH		5
-#define RTL8390_GROUP_SETTING_REG(_grp)		(0x00ec - 4 * (_grp / 2))
-#define RTL8390_GROUP_SETTING_SHIFT(_grp, _idx)	\
-	(RTL8390_GROUP_SETTING_WIDTH * ((_idx) + RTL8390_PORT_LED_COUNT * (_grp % 2)))
-#define RTL8390_GROUP_SETTING(_grp, _idx)	{				\
-		.reg = RTL8390_GROUP_SETTING_REG(_grp) ,			\
-		.lsb = RTL8390_GROUP_SETTING_SHIFT(_grp, _idx),			\
-		.msb = RTL8390_GROUP_SETTING_SHIFT(_grp, (_idx) + 1) - 1,	\
-	}
+#define RTL8390_GROUP_SETTING_REG(grp)		(0x00ec - 4 * ((grp) / 2))
+#define RTL8390_GROUP_SETTING_SHIFT(grp, idx)	\
+	(RTL8390_GROUP_SETTING_WIDTH * ((idx) + RTL8390_PORT_LED_COUNT * ((grp) % 2)))
 
 static const struct regfield_led_modes rtl8390_port_led_modes = {
 	.off = 0,
@@ -540,6 +531,14 @@ static struct reg_field rtl8390_port_led_regfield(unsigned int port, unsigned in
 	struct reg_field field = REG_FIELD(reg, shift, shift + 2);
 
 	return field;
+}
+
+static struct reg_field rtl8390_port_led_group_regfield(unsigned int group, unsigned int index)
+{
+	unsigned int reg = RTL8390_GROUP_SETTING_REG(group);
+	unsigned int shift = RTL8390_GROUP_SETTING_SHIFT(group, index);
+
+	return (struct reg_field) REG_FIELD(reg, shift, shift + RTL8390_GROUP_SETTING_WIDTH - 1);
 }
 
 static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
@@ -625,26 +624,13 @@ static const struct switch_port_led_config rtl8390_port_led_config = {
 	.independent_secondaries = true,
 	.modes = &rtl8390_port_led_modes,
 	.led_regfield = rtl8390_port_led_regfield,
+	.group_regfield = rtl8390_port_led_group_regfield,
 	.led_commit = rtl8390_port_led_commit,
 	.init = rtl8390_port_led_init,
 	.set_hw_managed = rtl8390_port_led_set_hw_managed,
 	.trigger_xlate = rtl8390_port_trigger_xlate,
 	.map_group = rtl_generic_port_led_map_group,
 	.assign_group = rtl8390_port_led_assign_group,
-	.group_settings = {
-		RTL8390_GROUP_SETTING(0, 0),
-		RTL8390_GROUP_SETTING(0, 1),
-		RTL8390_GROUP_SETTING(0, 2),
-		RTL8390_GROUP_SETTING(1, 0),
-		RTL8390_GROUP_SETTING(1, 1),
-		RTL8390_GROUP_SETTING(1, 2),
-		RTL8390_GROUP_SETTING(2, 0),
-		RTL8390_GROUP_SETTING(2, 1),
-		RTL8390_GROUP_SETTING(2, 2),
-		RTL8390_GROUP_SETTING(3, 0),
-		RTL8390_GROUP_SETTING(3, 1),
-		RTL8390_GROUP_SETTING(3, 2),
-	},
 };
 
 /*
@@ -882,13 +868,13 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	struct switch_port_led_ctrl *ctrl;
 	struct device *dev = &pdev->dev;
 	struct device_node *np, *child;
-	struct reg_field group_setting;
 	unsigned int member_map_count;
 	enum rtl_led_output_mode mode;
+	struct reg_field group_field;
 	struct led_port_group *group;
 	struct switch_port_led *pled;
 	const char *mode_name;
-	int i, i_grp, i_led;
+	int i_grp, i_led;
 	int err;
 
 	np = dev->of_node;
@@ -935,14 +921,12 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 
 	for (i_grp = 0; i_grp < ctrl->cfg->group_count; i_grp++) {
 		for (i_led = 0; i_led < ctrl->cfg->port_led_count; i_led++) {
-			i = GROUP_LIST_INDEX(ctrl->cfg, i_grp, i_led);
+			group_field = ctrl->cfg->group_regfield(i_grp, i_led);
 
-			group = &ctrl->groups[i];
-			group_setting = ctrl->cfg->group_settings[i];
-
+			group = &ctrl->groups[GROUP_LIST_INDEX(ctrl->cfg, i_grp, i_led)];
 			group->index = i_grp;
 			group->size = ctrl->cfg->port_count;
-			group->setting = devm_regmap_field_alloc(dev, ctrl->map, group_setting);
+			group->setting = devm_regmap_field_alloc(dev, ctrl->map, group_field);
 			if (!group->setting)
 				return -ENOMEM;
 
