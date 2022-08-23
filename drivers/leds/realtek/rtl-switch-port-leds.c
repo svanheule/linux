@@ -321,10 +321,9 @@ static int rtl8380_port_led_set_hw_managed(struct switch_port_led *led, bool hw_
 static struct reg_field rtl8380_port_led_regfield(unsigned int port, unsigned int index)
 {
 	unsigned int reg = RTL8380_REG_LED_SW_CTRL(port);
-	unsigned int offset = 3 * index;
-	struct reg_field field = REG_FIELD(reg, offset, offset + 2);
+	unsigned int shift = 3 * index;
 
-	return field;
+	return (struct reg_field) REG_FIELD(reg, shift, shift + 2);
 }
 
 static struct reg_field rtl8380_port_led_group_regfield(unsigned int group, unsigned int index)
@@ -409,12 +408,11 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	 * none of the LEDs are used. If no LEDs are configured, we must use the
 	 * value of the low port mask.
 	 */
-	if (led_enable_mask_low) {
-		led_enable_mask_low = GENMASK(fls(led_enable_mask_low) - 1, 0);
+	if (!led_enable_mask_high)
+		led_enable_mask_high = led_enable_mask_low;
 
-		if (!led_enable_mask_high)
-			led_enable_mask_high = led_enable_mask_low;
-	}
+	if (led_enable_mask_low)
+		led_enable_mask_low = GENMASK(fls(led_enable_mask_low) - 1, 0);
 	if (led_enable_mask_high)
 		led_enable_mask_high = GENMASK(fls(led_enable_mask_high) - 1, 0);
 
@@ -549,6 +547,8 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	static const u32 enable = BIT(5);
 	u32 led_count = 0;
 	unsigned int port;
+	u32 reg_mask;
+	u32 reg_val;
 	u32 pmask;
 	int err;
 
@@ -568,20 +568,6 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 		led_count = max(led_count, (u32) fls(led_mask->primary | led_mask->secondary));
 		pmask = BIT(port % 32);
 
-		/*
-		 * FIXME set both bits on (primary OR secondary)?
-		 * to make sure we will always trigger on port state
-		 */
-		//if (led_mask->primary) {
-		//	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_COPR_PMASK_CTRL(port), pmask_val, pmask_val);
-		//	if (err)
-		//		return err;
-		//}
-		//if (led_mask->secondary) {
-		//	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_FIB_PMASK_CTRL(port), pmask_val, pmask_val);
-		//	if (err)
-		//		return err;
-		//}
 		/*
 		 * SDK will only set the COPR_PMASK bit if an RJ45 port is
 		 * present, and FIB_PMASK if an SFP cage is present.
@@ -608,9 +594,11 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 			return err;
 	}
 
-	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL,
-		enable | led_count_mask | output_mode_mask,
-		enable | FIELD_PREP(led_count_mask, led_count) | FIELD_PREP(output_mode_mask, mode));
+	reg_mask = enable | led_count_mask | output_mode_mask;
+	reg_val = eanble;
+	reg_val |= FIELD_PREP(led_count_mask, led_count);
+	reg_val |= FIELD_PREP(output_mode_mask, mode);
+	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL, reg_mask, reg_val);
 
 	ctrl_dump_registers(ctrl, 0x00e0, 0x0214);
 
