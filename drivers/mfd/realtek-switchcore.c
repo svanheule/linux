@@ -100,7 +100,7 @@ static const struct mfd_cell rtl8380_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,maple-port-led"),
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
-		NULL, NULL, 0, 0, "realtek,rtl8380-aux-mdio"),
+		NULL, NULL, 0, 0, "realtek,maple-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
 		NULL, NULL, 0, 0, "realtek,maple-pinctrl"),
 };
@@ -116,7 +116,7 @@ static const struct mfd_cell rtl8390_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,cypress-port-led"),
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
-		NULL, NULL, 0, 0, "realtek,rtl8390-aux-mdio"),
+		NULL, NULL, 0, 0, "realtek,cypress-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
 		NULL, NULL, 0, 0, "realtek,cypress-pinctrl"),
 };
@@ -129,11 +129,11 @@ static const struct realtek_switchcore_data rtl8390_switchcore_data = {
 
 static const struct of_device_id of_realtek_switchcore_match[] = {
 	{
-		.compatible = "realtek,rtl8380-switchcore",
+		.compatible = "realtek,maple-switchcore",
 		.data = &rtl8380_switchcore_data,
 	},
 	{
-		.compatible = "realtek,rtl8390-switchcore",
+		.compatible = "realtek,cypress-switchcore",
 		.data = &rtl8390_switchcore_data,
 	},
 	{ /* sentinel */ }
