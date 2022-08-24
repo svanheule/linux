@@ -91,82 +91,81 @@ struct rtl_swcore_pinctrl {
 /*
  * RTL838x chips come in LQFP packages with 216 pins. Pins are indexed
  * counter-clockwise, starting with pin 1 at the bottom left.
- * Map package pin {1..216} to pinctrl pin number {0..215}.
  */
-static const struct pinctrl_pin_desc rtl8380_swcore_pins[] = {
+static const struct pinctrl_pin_desc rtl838x_swcore_pins[] = {
 	/* JTAG pins */
-	PINCTRL_PIN(27, "tck"),
-	PINCTRL_PIN(28, "tms"),
-	PINCTRL_PIN(29, "tdo"),
-	PINCTRL_PIN(30, "tdi"),
-	PINCTRL_PIN(31, "ntrst"),
+	PINCTRL_PIN(28, "tck"),
+	PINCTRL_PIN(29, "tms"),
+	PINCTRL_PIN(30, "tdo"),
+	PINCTRL_PIN(31, "tdi"),
+	PINCTRL_PIN(32, "ntrst"),
 	/* aux MDIO bus pins */
-	PINCTRL_PIN(109, "aux-mdio"),
-	PINCTRL_PIN(110, "aux-mdc"),
+	PINCTRL_PIN(110, "aux-mdio"),
+	PINCTRL_PIN(111, "aux-mdc"),
 	/* system LED pin */
-	PINCTRL_PIN(112, "sys-led"),
+	PINCTRL_PIN(113, "sys-led"),
 	/* UART1/SPI slave pins */
-	PINCTRL_PIN(115, "uart1-rx"),
-	PINCTRL_PIN(116, "uart1-tx"),
+	PINCTRL_PIN(116, "uart1-rx"),
+	PINCTRL_PIN(117, "uart1-tx"),
 };
 
-static const unsigned int rtl8380_jtag_pins[] = {27, 28, 29, 30, 31};
-static const unsigned int rtl8380_aux_mdio_pins[] = {109, 110};
-static const unsigned int rtl8380_sys_led_pins[] = {112};
-static const unsigned int rtl8380_uart1_pins[] = {115, 116};
+static const unsigned int rtl838x_jtag_pins[] = {28, 29, 30, 31, 32};
+static const unsigned int rtl838x_aux_mdio_pins[] = {110, 111};
+static const unsigned int rtl838x_sys_led_pins[] = {113};
+static const unsigned int rtl838x_uart1_pins[] = {116, 117};
 
-static const struct rtl_swcore_mux_desc rtl8380_mux_jtag =
-	SWITCHCORE_MUX("jtag", REG_FIELD(0x1000, 2, 3), rtl8380_jtag_pins);
+static const struct rtl_swcore_mux_desc rtl838x_mux_jtag =
+	SWITCHCORE_MUX("jtag", REG_FIELD(0x1000, 2, 3), rtl838x_jtag_pins);
 
-static const struct rtl_swcore_mux_desc rtl8380_mux_aux_mdio =
-	SWITCHCORE_MUX("aux-mdio", REG_FIELD(0xa0e0, 0, 0), rtl8380_aux_mdio_pins);
+static const struct rtl_swcore_mux_desc rtl838x_mux_aux_mdio =
+	SWITCHCORE_MUX("aux-mdio", REG_FIELD(0xa0e0, 0, 0), rtl838x_aux_mdio_pins);
 
-static const struct rtl_swcore_mux_desc rtl8380_mux_sys_led =
-	SWITCHCORE_MUX("sys-led", REG_FIELD(0xa000, 15, 15), rtl8380_sys_led_pins);
+static const struct rtl_swcore_mux_desc rtl838x_mux_sys_led =
+	SWITCHCORE_MUX("sys-led", REG_FIELD(0xa000, 15, 15), rtl838x_sys_led_pins);
 
-static const struct rtl_swcore_mux_desc rtl8380_mux_uart1 =
-	SWITCHCORE_MUX("uart1", REG_FIELD(0x1000, 4, 4), rtl8380_uart1_pins);
+static const struct rtl_swcore_mux_desc rtl838x_mux_uart1 =
+	SWITCHCORE_MUX("uart1", REG_FIELD(0x1000, 4, 4), rtl838x_uart1_pins);
 
-static const struct rtl_swcore_mux_desc *rtl8380_groups[] = {
-	&rtl8380_mux_jtag,
-	&rtl8380_mux_aux_mdio,
-	&rtl8380_mux_sys_led,
-	&rtl8380_mux_uart1,
+static const struct rtl_swcore_mux_desc *rtl838x_groups[] = {
+	&rtl838x_mux_jtag,
+	&rtl838x_mux_aux_mdio,
+	&rtl838x_mux_sys_led,
+	&rtl838x_mux_uart1,
 };
 
-static const struct rtl_swcore_mux_setting rtl8380_gpio_settings[] = {
-	{&rtl8380_mux_jtag, 2},
-	{&rtl8380_mux_aux_mdio, 0},
-	{&rtl8380_mux_sys_led, 0},
+static const struct rtl_swcore_mux_setting rtl838x_gpio_settings[] = {
+	{&rtl838x_mux_jtag, 2},
+	{&rtl838x_mux_aux_mdio, 0},
+	{&rtl838x_mux_sys_led, 0},
 };
-static const struct rtl_swcore_mux_setting rtl8380_aux_mdio_settings[] = {
-	{&rtl8380_mux_aux_mdio, 1},
+static const struct rtl_swcore_mux_setting rtl838x_aux_mdio_settings[] = {
+	{&rtl838x_mux_aux_mdio, 1},
 };
-static const struct rtl_swcore_mux_setting rtl8380_sys_led_settings[] = {
-	{&rtl8380_mux_sys_led, 1},
+static const struct rtl_swcore_mux_setting rtl838x_sys_led_settings[] = {
+	{&rtl838x_mux_sys_led, 1},
 };
-static const struct rtl_swcore_mux_setting rtl8380_uart1_settings[] = {
-	{&rtl8380_mux_uart1, 1},
+static const struct rtl_swcore_mux_setting rtl838x_uart1_settings[] = {
+	{&rtl838x_mux_uart1, 1},
 };
-static const struct rtl_swcore_mux_setting rtl8380_spi_slave_settings[] = {
-	{&rtl8380_mux_uart1, 0},
-};
-
-static const struct rtl_swcore_function_desc rtl8380_functions[] = {
-	SWITCHCORE_FUNCTION("gpio", rtl8380_gpio_settings),
-	SWITCHCORE_FUNCTION("aux-mdio", rtl8380_aux_mdio_settings),
-	SWITCHCORE_FUNCTION("sys-led", rtl8380_sys_led_settings),
-	SWITCHCORE_FUNCTION("uart1", rtl8380_uart1_settings),
-	SWITCHCORE_FUNCTION("spi-slave", rtl8380_spi_slave_settings),
+static const struct rtl_swcore_mux_setting rtl838x_spi_slave_settings[] = {
+	{&rtl838x_mux_uart1, 0},
 };
 
-static const struct rtl_swcore_config rtl8380_config = {
-	.pins = rtl8380_swcore_pins,
-	.npins = ARRAY_SIZE(rtl8380_swcore_pins),
-	.functions = rtl8380_functions,
-	.nfunctions = ARRAY_SIZE(rtl8380_functions),
-	.groups = rtl8380_groups,
-	.ngroups = ARRAY_SIZE(rtl8380_groups),
+static const struct rtl_swcore_function_desc rtl838x_functions[] = {
+	SWITCHCORE_FUNCTION("gpio", rtl838x_gpio_settings),
+	SWITCHCORE_FUNCTION("aux-mdio", rtl838x_aux_mdio_settings),
+	SWITCHCORE_FUNCTION("sys-led", rtl838x_sys_led_settings),
+	SWITCHCORE_FUNCTION("uart1", rtl838x_uart1_settings),
+	SWITCHCORE_FUNCTION("spi-slave", rtl838x_spi_slave_settings),
+};
+
+static const struct rtl_swcore_config rtl838x_config = {
+	.pins = rtl838x_swcore_pins,
+	.npins = ARRAY_SIZE(rtl838x_swcore_pins),
+	.functions = rtl838x_functions,
+	.nfunctions = ARRAY_SIZE(rtl838x_functions),
+	.groups = rtl838x_groups,
+	.ngroups = ARRAY_SIZE(rtl838x_groups),
 };
 
 /*
@@ -185,75 +184,75 @@ static const struct rtl_swcore_config rtl8380_config = {
  * 676 for pins with unknowns positions. When actual pin positions are found
  * (if ever), these can the be mapped to their real values.
  */
-#define RTL8390_VPIN(num)		(26 * 26 + (num))
+#define RTL839X_VPIN(num)		(26 * 26 + (num))
 
-static const struct pinctrl_pin_desc rtl8390_swcore_pins[] = {
+static const struct pinctrl_pin_desc rtl839x_swcore_pins[] = {
 	/* sys-led, or gpio0 */
-	PINCTRL_PIN(RTL8390_VPIN(0), "sys-led"),
+	PINCTRL_PIN(RTL839X_VPIN(0), "sys-led"),
 	/* aux mdio clock, or gpio2 */
-	PINCTRL_PIN(RTL8390_VPIN(2), "aux-mdc"),
+	PINCTRL_PIN(RTL839X_VPIN(2), "aux-mdc"),
 	/* aux mdio data, or gpio3 */
-	PINCTRL_PIN(RTL8390_VPIN(3), "aux-mdio"),
+	PINCTRL_PIN(RTL839X_VPIN(3), "aux-mdio"),
 	/* JTAG tck, UART1 cts, or gpio4 */
-	PINCTRL_PIN(RTL8390_VPIN(4), "tck"),
+	PINCTRL_PIN(RTL839X_VPIN(4), "tck"),
 	/* JTAG tdi, UART1 rx (?), or gpio6 */
-	PINCTRL_PIN(RTL8390_VPIN(6), "tdi"),
+	PINCTRL_PIN(RTL839X_VPIN(6), "tdi"),
 	/* JTAG tdo, UART1 tx (?), or gpio7 */
-	PINCTRL_PIN(RTL8390_VPIN(7), "tdo"),
+	PINCTRL_PIN(RTL839X_VPIN(7), "tdo"),
 };
 
-static const unsigned int rtl8390_jtag_pins[] = {
-	RTL8390_VPIN(4), RTL8390_VPIN(5), RTL8390_VPIN(6), RTL8390_VPIN(7)
+static const unsigned int rtl839x_jtag_pins[] = {
+	RTL839X_VPIN(4), RTL839X_VPIN(5), RTL839X_VPIN(6), RTL839X_VPIN(7)
 };
-static const unsigned int rtl8390_aux_mdio_pins[] = {
-	RTL8390_VPIN(2), RTL8390_VPIN(3)
+static const unsigned int rtl839x_aux_mdio_pins[] = {
+	RTL839X_VPIN(2), RTL839X_VPIN(3)
 };
-static const unsigned int rtl8390_sys_led_pins[] = {RTL8390_VPIN(0)};
+static const unsigned int rtl839x_sys_led_pins[] = {RTL839X_VPIN(0)};
 
-static const struct rtl_swcore_mux_desc rtl8390_mux_jtag =
-	SWITCHCORE_MUX("jtag", REG_FIELD(0x000a, 0, 1), rtl8390_jtag_pins);
+static const struct rtl_swcore_mux_desc rtl839x_mux_jtag =
+	SWITCHCORE_MUX("jtag", REG_FIELD(0x000a, 0, 1), rtl839x_jtag_pins);
 
-static const struct rtl_swcore_mux_desc rtl8390_mux_aux_mdio =
-	SWITCHCORE_MUX("aux-mdio", REG_FIELD(0x00e4, 18, 20), rtl8390_aux_mdio_pins);
+static const struct rtl_swcore_mux_desc rtl839x_mux_aux_mdio =
+	SWITCHCORE_MUX("aux-mdio", REG_FIELD(0x00e4, 18, 20), rtl839x_aux_mdio_pins);
 
-static const struct rtl_swcore_mux_desc rtl8390_mux_sys_led =
-	SWITCHCORE_MUX("sys-led", REG_FIELD(0x00e4, 14, 14), rtl8390_sys_led_pins);
+static const struct rtl_swcore_mux_desc rtl839x_mux_sys_led =
+	SWITCHCORE_MUX("sys-led", REG_FIELD(0x00e4, 14, 14), rtl839x_sys_led_pins);
 
-static const struct rtl_swcore_mux_desc *rtl8390_groups[] = {
-	&rtl8390_mux_jtag,
-	&rtl8390_mux_aux_mdio,
-	&rtl8390_mux_sys_led,
-};
-
-static const struct rtl_swcore_mux_setting rtl8390_gpio_settings[] = {
-	{&rtl8390_mux_jtag, 2},
-	{&rtl8390_mux_aux_mdio, 0},
-	{&rtl8390_mux_sys_led, 0},
-};
-static const struct rtl_swcore_mux_setting rtl8390_aux_mdio_settings[] = {
-	{&rtl8390_mux_aux_mdio, 4},
-};
-static const struct rtl_swcore_mux_setting rtl8390_sys_led_settings[] = {
-	{&rtl8390_mux_sys_led, 1},
-};
-static const struct rtl_swcore_mux_setting rtl8390_uart1_settings[] = {
-	{&rtl8390_mux_jtag, 1},
+static const struct rtl_swcore_mux_desc *rtl839x_groups[] = {
+	&rtl839x_mux_jtag,
+	&rtl839x_mux_aux_mdio,
+	&rtl839x_mux_sys_led,
 };
 
-static const struct rtl_swcore_function_desc rtl8390_functions[] = {
-	SWITCHCORE_FUNCTION("gpio", rtl8390_gpio_settings),
-	SWITCHCORE_FUNCTION("aux-mdio", rtl8390_aux_mdio_settings),
-	SWITCHCORE_FUNCTION("sys-led", rtl8390_sys_led_settings),
-	SWITCHCORE_FUNCTION("uart1", rtl8390_uart1_settings),
+static const struct rtl_swcore_mux_setting rtl839x_gpio_settings[] = {
+	{&rtl839x_mux_jtag, 2},
+	{&rtl839x_mux_aux_mdio, 0},
+	{&rtl839x_mux_sys_led, 0},
+};
+static const struct rtl_swcore_mux_setting rtl839x_aux_mdio_settings[] = {
+	{&rtl839x_mux_aux_mdio, 4},
+};
+static const struct rtl_swcore_mux_setting rtl839x_sys_led_settings[] = {
+	{&rtl839x_mux_sys_led, 1},
+};
+static const struct rtl_swcore_mux_setting rtl839x_uart1_settings[] = {
+	{&rtl839x_mux_jtag, 1},
 };
 
-static const struct rtl_swcore_config rtl8390_config = {
-	.pins = rtl8390_swcore_pins,
-	.npins = ARRAY_SIZE(rtl8390_swcore_pins),
-	.functions = rtl8390_functions,
-	.nfunctions = ARRAY_SIZE(rtl8390_functions),
-	.groups = rtl8390_groups,
-	.ngroups = ARRAY_SIZE(rtl8390_groups),
+static const struct rtl_swcore_function_desc rtl839x_functions[] = {
+	SWITCHCORE_FUNCTION("gpio", rtl839x_gpio_settings),
+	SWITCHCORE_FUNCTION("aux-mdio", rtl839x_aux_mdio_settings),
+	SWITCHCORE_FUNCTION("sys-led", rtl839x_sys_led_settings),
+	SWITCHCORE_FUNCTION("uart1", rtl839x_uart1_settings),
+};
+
+static const struct rtl_swcore_config rtl839x_config = {
+	.pins = rtl839x_swcore_pins,
+	.npins = ARRAY_SIZE(rtl839x_swcore_pins),
+	.functions = rtl839x_functions,
+	.nfunctions = ARRAY_SIZE(rtl839x_functions),
+	.groups = rtl839x_groups,
+	.ngroups = ARRAY_SIZE(rtl839x_groups),
 };
 
 /* TODO RTL9300 */
@@ -359,12 +358,12 @@ static int rtl_swcore_functions_init(struct pinctrl_dev *pctl, struct rtl_swcore
 
 static const struct of_device_id of_rtl_swcore_pinctrl_match[] = {
 	{
-		.compatible = "realtek,rtl8380-pinctrl",
-		.data = &rtl8380_config,
+		.compatible = "realtek,maple-pinctrl",
+		.data = &rtl838x_config,
 	},
 	{
-		.compatible = "realtek,rtl8390-pinctrl",
-		.data = &rtl8390_config,
+		.compatible = "realtek,cypress-pinctrl",
+		.data = &rtl839x_config,
 	},
 	{ /* sentinel */ }
 };
@@ -389,7 +388,6 @@ static int rtl_swcore_pinctrl_probe(struct platform_device *pdev)
 	if (!config)
 		return dev_err_probe(dev, -EINVAL, "no config\n");
 
-	/* FIXME of_get_parent(dev_of_node(dev)) OR dev_of_node(dev->parent) */
 	regmap = device_node_to_regmap(of_get_parent(dev_of_node(dev)));
 	if (IS_ERR(regmap))
 		return dev_err_probe(dev, PTR_ERR(regmap), "failed to find parent regmap\n");

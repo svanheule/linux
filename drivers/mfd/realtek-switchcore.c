@@ -102,7 +102,7 @@ static const struct mfd_cell rtl8380_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
 		NULL, NULL, 0, 0, "realtek,rtl8380-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
-		NULL, NULL, 0, 0, "realtek,rtl8380-pinctrl"),
+		NULL, NULL, 0, 0, "realtek,maple-pinctrl"),
 };
 
 static const struct realtek_switchcore_data rtl8380_switchcore_data = {
@@ -118,7 +118,7 @@ static const struct mfd_cell rtl8390_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
 		NULL, NULL, 0, 0, "realtek,rtl8390-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
-		NULL, NULL, 0, 0, "realtek,rtl8390-pinctrl"),
+		NULL, NULL, 0, 0, "realtek,cypress-pinctrl"),
 };
 
 static const struct realtek_switchcore_data rtl8390_switchcore_data = {
