@@ -16,7 +16,6 @@
 
 #include "led-regfield.h"
 
-/* TODO Change to tx/rx/link sysfs attributes like netdev? */
 /* Hardware independent port trigger flag list */
 #define PTRG_NONE		0
 #define PTRG_ACT_RX		BIT(0)
@@ -66,14 +65,19 @@ struct switch_port_led {
 };
 
 struct switch_port_led_config {
+	/* Number of switch ports with configurable LEDs */
 	unsigned int port_count;
+	/* Number of LEDs per port */
 	unsigned int port_led_count;
+	/* Number of groups the LEDs can be assigned to for status offloading */
 	unsigned int group_count;
+	/* Whether the secondary (SFP cage) LEDs can be controlled separately */
 	bool independent_secondaries;
 	/* Port LED reg_field */
 	const struct regfield_led_modes *modes;
-	/* TODO just pass switch_port_led *? */
+	/* reg_field storing the index-specific user mode */
 	struct reg_field (*led_regfield)(unsigned int port, unsigned int index);
+	/* reg_field storing the index-specific offloaded group setting */
 	struct reg_field (*group_regfield)(unsigned int group, unsigned int index);
 	void (*led_commit)(struct regfield_led *led);
 	/* Configure and start the peripheral */
@@ -164,10 +168,14 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
  */
 #define RTL8380_REG_LED_MODE_SEL		0x1004
 #define RTL8380_REG_LED_GLB_CTRL		0xa000
+#define RTL8380_GLB_CTRL_COMBO_MODE		GENMASK(8, 7)
+#define RTL8380_GLB_CTRL_HIGH_PORTS		GENMASK(5, 3)
+#define RTL8380_GLB_CTRL_LOW_PORTS		GENMASK(2, 0)
 #define RTL8380_REG_LED_MODE_CTRL		0xa004
 #define RTL8380_REG_LED_P_EN_CTRL		0xa008
-#define RTL8380_REG_LED_SW_P_EN_CTRL(led)	(0xa010 + 4 * (led)->index)
+#define RTL8380_REG_LED_SW_P_EN_CTRL(index)	(0xa010 + 4 * (index))
 #define RTL8380_REG_LED_SW_CTRL(port)		(0xa01c + 4 * (port))
+#define RTL8380_SW_SETTING_WIDTH		3
 
 #define RTL8380_PORT_LED_COUNT			3
 #define RTL8380_GROUP_SETTING_WIDTH		5
@@ -258,7 +266,7 @@ static int rtl8380_port_trigger_xlate(struct switch_port_led *led, u32 port_led_
 }
 
 /*
- * RTL8380 has two static groups:
+ * Maple/RTL838x has two static groups:
  *   - group 0: ports 0-23
  *   - group 1: ports 24-27
  *
@@ -298,21 +306,15 @@ static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led 
 int rtl8380_port_led_assign_group(struct switch_port_led *led, struct led_port_group *group)
 {
 	/*
-	 * FIXME Should we check at all?
-	 * map_group() will only provide valid groups anyway, so this is redundant
-	 * in theory
+	 * Since group assignments are static on Maple, this is a no-op.
+	 * rtl8380_port_led_map_group() will provide the correct group assignments.
 	 */
-	/* FIXME Use macro for port count */
-	/* Doesn't match static groups */
-	if ((led->port < 24 && group->index == 1) || (led->port >= 24 && group->index == 0))
-		return -EINVAL;
-
 	return 0;
 }
 
 static int rtl8380_port_led_set_hw_managed(struct switch_port_led *led, bool hw_managed)
 {
-	unsigned int reg = RTL8380_REG_LED_SW_P_EN_CTRL(led);
+	unsigned int reg = RTL8380_REG_LED_SW_P_EN_CTRL(led->index);
 	u32 val = hw_managed ? 0 : BIT(led->port);
 
 	return regmap_update_bits(led->ctrl->map, reg, BIT(led->port), val);
@@ -321,9 +323,9 @@ static int rtl8380_port_led_set_hw_managed(struct switch_port_led *led, bool hw_
 static struct reg_field rtl8380_port_led_regfield(unsigned int port, unsigned int index)
 {
 	unsigned int reg = RTL8380_REG_LED_SW_CTRL(port);
-	unsigned int shift = 3 * index;
+	unsigned int shift = index * RTL8380_SW_SETTING_WIDTH;
 
-	return (struct reg_field) REG_FIELD(reg, shift, shift + 2);
+	return (struct reg_field) REG_FIELD(reg, shift, shift + RTL8380_SW_SETTING_WIDTH - 1);
 }
 
 static struct reg_field rtl8380_port_led_group_regfield(unsigned int group, unsigned int index)
@@ -343,6 +345,8 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	unsigned int combo_port_max = 0;
 	unsigned int combo_port_val = 0;
 	unsigned int port;
+	u32 glb_ctrl_mask;
+	u32 glb_ctrl_val;
 	u32 port_mask;
 	int err;
 
@@ -394,11 +398,8 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	else if (combo_port_min < ctrl->cfg->port_count)
 		combo_port_val = 2;
 
-	/* FIXME macros */
-	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, GENMASK(8, 7),
-			FIELD_PREP(GENMASK(8, 7), combo_port_val));
-	if (err)
-		return err;
+	glb_ctrl_mask = RTL8380_GLB_CTRL_COMBO_MODE;
+	glb_ctrl_val = FIELD_PREP(RTL8380_GLB_CTRL_COMBO_MODE, combo_port_val);
 
 	/*
 	 * The number-of-LEDs-per-port fields require a mask instead of a number.
@@ -416,8 +417,11 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	if (led_enable_mask_high)
 		led_enable_mask_high = GENMASK(fls(led_enable_mask_high) - 1, 0);
 
-	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, GENMASK(5, 0),
-			(led_enable_mask_high << 3) | led_enable_mask_low);
+	glb_ctrl_mask |= RTL8380_GLB_CTRL_HIGH_PORTS | RTL8380_GLB_CTRL_LOW_PORTS;
+	glb_ctrl_val |= FIELD_PREP(RTL8380_GLB_CTRL_LOW_PORTS, led_enable_mask_low);
+	glb_ctrl_val |= FIELD_PREP(RTL8380_GLB_CTRL_HIGH_PORTS, led_enable_mask_high);
+
+	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, glb_ctrl_mask, glb_ctrl_val);
 	if (err)
 		return err;
 
@@ -458,6 +462,7 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 #define RTL8390_REG_LED_SW_P_CTRL(port)		(0x0144 + 4 * (port))
 
 #define RTL8390_PORT_LED_COUNT			3
+#define RTL8390_SW_SETTING_WIDTH		3
 #define RTL8390_GROUP_SETTING_WIDTH		5
 #define RTL8390_GROUP_SETTING_REG(grp)		(0x00ec - 4 * ((grp) / 2))
 #define RTL8390_GROUP_SETTING_SHIFT(grp, idx)	\
@@ -479,7 +484,7 @@ static const struct regfield_led_modes rtl8390_port_led_modes = {
 
 static void rtl8390_port_led_commit(struct regfield_led *rled)
 {
-    const struct switch_port_led *led = container_of(rled, struct switch_port_led, led);
+	const struct switch_port_led *led = container_of(rled, struct switch_port_led, led);
 
 	/*
 	 * Could trigger the latching with delayed work,
@@ -525,10 +530,9 @@ static int rtl8390_port_led_set_hw_managed(struct switch_port_led *led, bool hw_
 static struct reg_field rtl8390_port_led_regfield(unsigned int port, unsigned int index)
 {
 	unsigned int reg = RTL8390_REG_LED_SW_P_CTRL(port);
-	unsigned int shift = index * 3;
-	struct reg_field field = REG_FIELD(reg, shift, shift + 2);
+	unsigned int shift = index * RTL8390_SW_SETTING_WIDTH;
 
-	return field;
+	return (struct reg_field) REG_FIELD(reg, shift, shift + RTL8390_SW_SETTING_WIDTH - 1);
 }
 
 static struct reg_field rtl8390_port_led_group_regfield(unsigned int group, unsigned int index)
@@ -595,7 +599,7 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	}
 
 	reg_mask = enable | led_count_mask | output_mode_mask;
-	reg_val = eanble;
+	reg_val = enable;
 	reg_val |= FIELD_PREP(led_count_mask, led_count);
 	reg_val |= FIELD_PREP(output_mode_mask, mode);
 	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL, reg_mask, reg_val);
@@ -635,9 +639,7 @@ static ssize_t rtl_hw_trigger_show(struct device *dev, struct device_attribute *
 }
 
 /*
- * Add an LED without a current group assigment to a group.
- * If the LED is already part of a group, call rtl_hw_trigger_leave_group()
- * before joining the new group.
+ * Add an LED to a group, leaving the old group as required.
  * To enable HW offloading, the HW trigger must be enabled separately.
  */
 static int rtl_hw_trigger_assign(struct switch_port_led *led, int trigger)
@@ -722,9 +724,10 @@ err_out:
 }
 static DEVICE_ATTR_RW(rtl_hw_trigger);
 
+/* TODO Change to tx/rx/link sysfs attributes like netdev? */
 static struct attribute *rtl_hw_trigger_attrs[] = {
 	&dev_attr_rtl_hw_trigger.attr,
-	NULL,
+	NULL
 };
 ATTRIBUTE_GROUPS(rtl_hw_trigger);
 
@@ -809,7 +812,7 @@ static struct switch_port_led *switch_port_led_probe_single(
 
 	port_index = of_read_number(addr, 1);
 	led_index = of_read_number(addr + 1, 1);
-	is_secondary = !!of_read_number(addr + 2, 1);
+	is_secondary = of_read_number(addr + 2, 1);
 
 	if (port_index >= ctrl->cfg->port_count) {
 		dev_warn(ctrl->dev, "invalid port number %d\n", port_index);
@@ -934,6 +937,7 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 			return dev_err_probe(dev, -EINVAL, "#address-cells (%d) is not 3\n",
 				(u32) of_n_addr_cells(child));
 		}
+
 		if (of_n_size_cells(child) != 0) {
 			of_node_put(child);
 			return dev_err_probe(dev, -EINVAL, "#size-cells (%d) is not 0\n",
@@ -946,10 +950,8 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 		}
 
 		pled = switch_port_led_probe_single(ctrl, child);
-		if (IS_ERR(pled)) {
+		if (IS_ERR(pled))
 			dev_warn(dev, "failed to register led: %ld\n", PTR_ERR(pled));
-			continue;
-		}
 	}
 
 	return ctrl->cfg->init(ctrl, mode);
@@ -972,7 +974,7 @@ static struct platform_driver realtek_switch_port_led_driver = {
 	.probe = realtek_port_led_probe,
 	.driver = {
 		.name = "realtek-switch-port-led",
-		.of_match_table = of_switch_port_led_match
+		.of_match_table = of_switch_port_led_match,
 	}
 };
 module_platform_driver(realtek_switch_port_led_driver);
