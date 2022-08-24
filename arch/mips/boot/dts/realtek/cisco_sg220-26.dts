@@ -20,6 +20,10 @@
 
 	aliases {
 		mdio-gpio1 = &mdio1;
+		led-boot = &led_status;
+		led-failsafe = &led_status;
+		led-running = &led_status;
+		led-upgrade = &led_status;
 	};
 
 	memory@0 {
@@ -151,8 +155,233 @@
 //	};
 
 	switchcore-bus@1b000000 {
-		compatible = "realtek,rtl8380-switchcore", "syscon";
+		compatible = "realtek,maple-switchcore", "syscon";
 		reg = <0x1b000000 0x10000>;
+
+		port-leds {
+			compatible = "realtek,maple-port-led";
+			#address-cells = <3>;
+			#size-cells = <0>;
+
+			realtek,output-mode = "serial";
+
+			led@0,0,0 {
+				reg = <0 0 0>;
+				label = "lan1:act:green";
+			};
+			led@0,1,0 {
+				reg = <0 1 0>;
+				label = "lan1:poe:amber";
+			};
+			led@1,0,0 {
+				reg = <1 0 0>;
+				label = "lan2:act:green";
+			};
+			led@1,1,0 {
+				reg = <1 1 0>;
+				label = "lan2:poe:amber";
+			};
+			led@2,0,0 {
+				reg = <2 0 0>;
+				label = "lan3:act:green";
+			};
+			led@2,1,0 {
+				reg = <2 1 0>;
+				label = "lan3:poe:amber";
+			};
+			led@3,0,0 {
+				reg = <3 0 0>;
+				label = "lan4:act:green";
+			};
+			led@3,1,0 {
+				reg = <3 1 0>;
+				label = "lan4:poe:amber";
+			};
+			led@4,0,0 {
+				reg = <4 0 0>;
+				label = "lan5:act:green";
+			};
+			led@4,1,0 {
+				reg = <4 1 0>;
+				label = "lan5:poe:amber";
+			};
+			led@5,0,0 {
+				reg = <5 0 0>;
+				label = "lan6:act:green";
+			};
+			led@5,1,0 {
+				reg = <5 1 0>;
+				label = "lan6:poe:amber";
+			};
+			led@6,0,0 {
+				reg = <6 0 0>;
+				label = "lan7:act:green";
+			};
+			led@6,1,0 {
+				reg = <6 1 0>;
+				label = "lan7:poe:amber";
+			};
+			led@7,0,0 {
+				reg = <7 0 0>;
+				label = "lan8:act:green";
+			};
+			led@7,1,0 {
+				reg = <7 1 0>;
+				label = "lan8:poe:amber";
+			};
+			led@8,0,0 {
+				reg = <8 0 0>;
+				label = "lan9:act:green";
+			};
+			led@8,1,0 {
+				reg = <8 1 0>;
+				label = "lan9:poe:amber";
+			};
+			led@9,0,0 {
+				reg = <9 0 0>;
+				label = "lan10:act:green";
+			};
+			led@9,1,0 {
+				reg = <9 1 0>;
+				label = "lan10:poe:amber";
+			};
+			led@10,0,0 {
+				reg = <10 0 0>;
+				label = "lan11:act:green";
+			};
+			led@10,1,0 {
+				reg = <10 1 0>;
+				label = "lan11:poe:amber";
+			};
+			led@11,0,0 {
+				reg = <11 0 0>;
+				label = "lan12:act:green";
+			};
+			led@11,1,0 {
+				reg = <11 1 0>;
+				label = "lan12:poe:amber";
+			};
+			led@12,0,0 {
+				reg = <12 0 0>;
+				label = "lan13:act:green";
+			};
+			led@12,1,0 {
+				reg = <12 1 0>;
+				label = "lan13:poe:amber";
+			};
+			led@13,0,0 {
+				reg = <13 0 0>;
+				label = "lan14:act:green";
+			};
+			led@13,1,0 {
+				reg = <13 1 0>;
+				label = "lan14:poe:amber";
+			};
+			led@14,0,0 {
+				reg = <14 0 0>;
+				label = "lan15:act:green";
+			};
+			led@14,1,0 {
+				reg = <14 1 0>;
+				label = "lan15:poe:amber";
+			};
+			led@15,0,0 {
+				reg = <15 0 0>;
+				label = "lan16:act:green";
+			};
+			led@15,1,0 {
+				reg = <15 1 0>;
+				label = "lan16:poe:amber";
+			};
+			led@16,0,0 {
+				reg = <16 0 0>;
+				label = "lan17:act:green";
+			};
+			led@16,1,0 {
+				reg = <16 1 0>;
+				label = "lan17:poe:amber";
+			};
+			led@17,0,0 {
+				reg = <17 0 0>;
+				label = "lan18:act:green";
+			};
+			led@17,1,0 {
+				reg = <17 1 0>;
+				label = "lan18:poe:amber";
+			};
+			led@18,0,0 {
+				reg = <18 0 0>;
+				label = "lan19:act:green";
+			};
+			led@18,1,0 {
+				reg = <18 1 0>;
+				label = "lan19:poe:amber";
+			};
+			led@19,0,0 {
+				reg = <19 0 0>;
+				label = "lan20:act:green";
+			};
+			led@19,1,0 {
+				reg = <19 1 0>;
+				label = "lan20:poe:amber";
+			};
+			led@20,0,0 {
+				reg = <20 0 0>;
+				label = "lan21:act:green";
+			};
+			led@20,1,0 {
+				reg = <20 1 0>;
+				label = "lan21:poe:amber";
+			};
+			led@21,0,0 {
+				reg = <21 0 0>;
+				label = "lan22:act:green";
+			};
+			led@21,1,0 {
+				reg = <21 1 0>;
+				label = "lan22:poe:amber";
+			};
+			led@22,0,0 {
+				reg = <22 0 0>;
+				label = "lan23:act:green";
+			};
+			led@22,1,0 {
+				reg = <22 1 0>;
+				label = "lan23:poe:amber";
+			};
+			led@23,0,0 {
+				reg = <23 0 0>;
+				label = "lan24:act:green";
+			};
+			led@23,1,0 {
+				reg = <23 1 0>;
+				label = "lan24:poe:amber";
+			};
+			led@24,0,0 {
+				reg = <24 0 0>;
+				label = "lan25:act:green";
+			};
+			led@24,1,0 {
+				reg = <24 1 0>;
+				label = "lan25:gbit:green";
+			};
+			led@25,0,0 {
+				reg = <25 0 0>;
+				label = "lan26:act:green";
+			};
+			led@25,1,0 {
+				reg = <25 1 0>;
+				label = "lan26:gbit:green";
+			};
+			led_status: led@26,1,0 {
+				reg = <26 1 0>;
+				label = "status:green";
+			};
+			led@27,1,0 {
+				reg = <27 1 0>;
+				label = "status:amber";
+			};
+		};
 	};
 
 //	switchcore@1b000000 {
