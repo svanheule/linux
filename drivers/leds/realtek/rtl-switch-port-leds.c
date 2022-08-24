@@ -968,12 +968,12 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 
 static const struct of_device_id of_switch_port_led_match[] = {
 	{
-		.compatible = "realtek,rtl8380-port-led",
-		.data = &rtl8380_port_led_config
+		.compatible = "realtek,maple-port-led",
+		.data = &rtl8380_port_led_config,
 	},
 	{
-		.compatible = "realtek,rtl8390-port-led",
-		.data = &rtl8390_port_led_config
+		.compatible = "realtek,cypress-port-led",
+		.data = &rtl8390_port_led_config,
 	},
 	{ /* sentinel */ }
 };

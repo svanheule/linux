@@ -98,7 +98,7 @@ static void rtl8390_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 static const struct mfd_cell rtl8380_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,maple-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
-		NULL, NULL, 0, 0, "realtek,rtl8380-port-led"),
+		NULL, NULL, 0, 0, "realtek,maple-port-led"),
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
 		NULL, NULL, 0, 0, "realtek,rtl8380-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
@@ -114,7 +114,7 @@ static const struct realtek_switchcore_data rtl8380_switchcore_data = {
 static const struct mfd_cell rtl8390_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,cypress-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
-		NULL, NULL, 0, 0, "realtek,rtl8390-port-led"),
+		NULL, NULL, 0, 0, "realtek,cypress-port-led"),
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
 		NULL, NULL, 0, 0, "realtek,rtl8390-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
