@@ -649,28 +649,45 @@ static int rtl_hw_trigger_assign(struct switch_port_led *led, int trigger)
 	u32 rtl_trigger;
 	int err;
 
+	/*
+	 * Need to leave old group first, since we may need this to allocate a
+	 * new group. On assignment failure, this needs to be rolled back.
+	 */
+	if(led->current_group)
+		bitmap_clear(led->current_group->ports, led->port, 1);
+
 	rtl_trigger = cfg->trigger_xlate(led, trigger);
-	if (rtl_trigger < 0)
-		return rtl_trigger;
+	if (rtl_trigger < 0) {
+		err = rtl_trigger;
+		goto err_out;
+	}
 
 	group = cfg->map_group(led, trigger);
-	if (IS_ERR(group))
-		return PTR_ERR(group);
+	if (IS_ERR(group)) {
+		err = PTR_ERR(group);
+		goto err_out;
+	}
 
 	if (bitmap_empty(group->ports, group->size)) {
 		err = regmap_field_write(group->setting, rtl_trigger);
 		if (err)
-			return err;
+			goto err_out;
 	}
 
 	err = cfg->assign_group(led, group);
 	if (err)
-		return err;
+		goto err_out;
 
 	bitmap_set(group->ports, led->port, 1);
 	led->current_group = group;
 
 	return 0;
+
+err_out:
+	if(led->current_group)
+		bitmap_set(led->current_group->ports, led->port, 1);
+
+	return err;
 }
 
 static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute *attr,
@@ -699,17 +716,9 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 	if (!pled->current_group)
 		goto out;
 
-	/*
-	 * If rtl_hw_trigger_assign() fails, there is no state that needs to be
-	 * reverted, so the LED can be rejoined to the old group without
-	 * issues.
-	 */
-	bitmap_clear(pled->current_group->ports, pled->port, 1);
 	err = rtl_hw_trigger_assign(pled, value);
-	if (err) {
-		bitmap_set(pled->current_group->ports, pled->port, 1);
+	if (err)
 		goto err_out;
-	}
 
 out:
 	pled->trigger_flags = value;
