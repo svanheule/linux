@@ -114,11 +114,11 @@
 	};
 
 	switchcore-bus@1b000000 {
-		compatible = "realtek,rtl8380-switchcore", "syscon";
+		compatible = "realtek,maple-switchcore", "syscon";
 		reg = <0x1b000000 0x10000>;
 
 		pinctrl {
-			compatible = "realtek,rtl8380-pinctrl";
+			compatible = "realtek,maple-pinctrl";
 
 			sys_led_pins: sys-led-mux {
 				groups = "sys-led";
@@ -142,7 +142,7 @@
 		};
 
 		port-leds {
-			compatible = "realtek,rtl8380-port-led";
+			compatible = "realtek,maple-port-led";
 			#address-cells = <3>;
 			#size-cells = <0>;
 
