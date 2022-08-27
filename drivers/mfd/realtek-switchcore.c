@@ -24,66 +24,93 @@ struct realtek_switchcore_ctrl {
 	const struct realtek_switchcore_data *data;
 };
 
-#define MODEL_NAME_CHAR_XLATE(val)		((val) ? 'A' + (val) - 1 : '\0')
-#define MODEL_NAME_CHAR(reg, msb, lsb)		(MODEL_NAME_CHAR_XLATE(FIELD_GET(GENMASK((msb), (lsb)), (val))))
-
 /*
  * Model name probe
  *
  * Reads the family-specific MODEL_NAME_INFO register
  * to identify the SoC model and revision
  */
-#define RTL8380_REG_MODEL_NAME_INFO		0x00d4
-#define RTL8380_REG_CHIP_INFO			0x00d8
+#define MODEL_NAME_CHAR_XLATE(val)	((val) ? 'A' + (val) - 1 : '\0')
+#define MODEL_NAME_CHAR(reg, mask)	MODEL_NAME_CHAR_XLATE(FIELD_GET((mask), (val)))
 
-#define RTL8380_REG_INT_RW_CTRL			0x0058
+#define RTL_MODEL_ID_FIELD		GENMASK(31, 16)
 
-static void rtl8380_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
+#define RTL_CHIP_INFO_UNLOCK		GENMASK(31, 28)
+#define RTL_CHIP_INFO_UNLOCK_CODE	0xa
+#define RTL_CHIP_INFO_CHIP_REV		GENMASK(20, 16)
+#define RTL_CHIP_INFO_RLID		GENMASK(15, 0)
+
+/* Maple registers */
+#define RTL838X_REG_MODEL_NAME_INFO	0x00d4
+#define RTL838X_REG_CHIP_INFO		0x00d8
+#define RTL838X_REG_MODE_DEFINE_CTL	0x1024
+
+#define RTL838X_REG_INT_RW_CTRL		0x0058
+
+/* Cypress registers */
+#define RTL839X_REG_MODEL_NAME_INFO	0x0ff0
+#define RTL839X_REG_CHIP_INFO		0x0ff4
+
+static void rtl83xx_read_chip_info(struct regmap *map, unsigned int reg,
+				      char *chip_rev, unsigned int *rl_id)
 {
-	char model_char[4] = {0, 0, 0, 0};
-	u32 model_id, rl_id;
-	char chip_rev;
 	u32 val = 0;
 
-	regmap_read(ctrl->map, RTL8380_REG_MODEL_NAME_INFO, &val);
-	model_id = FIELD_GET(GENMASK(31, 16), val);
-	model_char[0] = MODEL_NAME_CHAR(val, 15, 11);
-	model_char[1] = MODEL_NAME_CHAR(val, 10, 6);
-	model_char[2] = MODEL_NAME_CHAR(val, 5, 1);
-
-	/* CHIP_INFO register must be unlocked by writing 0xa to the top bits */
-	regmap_write(ctrl->map, RTL8380_REG_CHIP_INFO, FIELD_PREP(GENMASK(31, 28), 0xa));
-	regmap_read(ctrl->map, RTL8380_REG_CHIP_INFO, &val);
-	chip_rev = MODEL_NAME_CHAR(val, 20, 16) ?: '0';
-	rl_id = FIELD_GET(GENMASK(15, 0), val);
-
-	dev_info(ctrl->dev, "found RTL%04x%s rev. %c, CPU RTL%04x\n",
-		model_id, model_char, chip_rev, rl_id);
+	regmap_write(map, reg, FIELD_PREP(RTL_CHIP_INFO_UNLOCK, RTL_CHIP_INFO_UNLOCK_CODE));
+	regmap_read(map, reg, &val);
+	*chip_rev = MODEL_NAME_CHAR(val, RTL_CHIP_INFO_CHIP_REV) ?: '0';
+	*rl_id = FIELD_GET(RTL_CHIP_INFO_RLID, val);
 }
 
-#define RTL8390_REG_MODEL_NAME_INFO	0x0ff0
-#define RTL8390_REG_CHIP_INFO		0x0ff4
-
-static void rtl8390_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
+static void rtl_swcore_chip_print(struct device *dev, unsigned int model_id,
+				  const char *model_suffix, unsigned int chip_rev,
+				  unsigned int rl_id)
 {
-	char model_char[3] = {0, 0, 0};
+	dev_info(dev, "found RTL%04x%s rev. %c, RL:%04x\n",
+		 model_id, model_suffix, chip_rev, rl_id);
+}
+
+static void rtl838x_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
+{
+	char model_char[4] = {};
 	u32 model_id, rl_id;
 	char chip_rev;
 	u32 val = 0;
 
-	regmap_read(ctrl->map, RTL8390_REG_MODEL_NAME_INFO, &val);
+	regmap_read(ctrl->map, RTL838X_REG_MODEL_NAME_INFO, &val);
+	model_id = FIELD_GET(RTL_MODEL_ID_FIELD, val);
+	model_char[0] = MODEL_NAME_CHAR(val, GENMASK(15, 11));
+	model_char[1] = MODEL_NAME_CHAR(val, GENMASK(10, 6));
+	model_char[2] = MODEL_NAME_CHAR(val, GENMASK(5, 1));
+
+	if (model_id == 0x8380) {
+		regmap_read(ctrl->map, RTL838X_REG_MODE_DEFINE_CTL, &val);
+		/*
+		 * Undocumented bit which is only set on RTL8380M.
+		 * Possibly related to the presence of QSGMII ports for external phy.
+		 */
+		if (!(val & BIT(23)))
+			model_id = 0x8381;
+	}
+
+	rtl83xx_read_chip_info(ctrl->map, RTL838X_REG_CHIP_INFO, &chip_rev, &rl_id);
+	rtl_swcore_chip_print(ctrl->dev, model_id, model_char, chip_rev, rl_id);
+}
+
+static void rtl839x_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
+{
+	char model_char[3] = {};
+	u32 model_id, rl_id;
+	char chip_rev;
+	u32 val = 0;
+
+	regmap_read(ctrl->map, RTL839X_REG_MODEL_NAME_INFO, &val);
 	model_id = FIELD_GET(GENMASK(31, 16), val);
-	model_char[0] = MODEL_NAME_CHAR(val, 15, 11);
-	model_char[1] = MODEL_NAME_CHAR(val, 10, 6);
+	model_char[0] = MODEL_NAME_CHAR(val, GENMASK(15, 11));
+	model_char[1] = MODEL_NAME_CHAR(val, GENMASK(10, 6));
 
-	/* CHIP_INFO register must be unlocked by writing 0xa to the top bits */
-	regmap_write(ctrl->map, RTL8390_REG_CHIP_INFO, FIELD_PREP(GENMASK(31, 28), 0xa));
-	regmap_read(ctrl->map, RTL8390_REG_CHIP_INFO, &val);
-	chip_rev = MODEL_NAME_CHAR(val, 20, 16) ?: '0';
-	rl_id = FIELD_GET(GENMASK(15, 0), val);
-
-	dev_info(ctrl->dev, "found RTL%04x%s rev. %c, CPU RTL%04x\n",
-		model_id, model_char, chip_rev, rl_id);
+	rtl83xx_read_chip_info(ctrl->map, RTL839X_REG_CHIP_INFO, &chip_rev, &rl_id);
+	rtl_swcore_chip_print(ctrl->dev, model_id, model_char, chip_rev, rl_id);
 }
 
 /*
@@ -95,7 +122,7 @@ static void rtl8390_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
  * TODO Move back here from split driver
  */
 
-static const struct mfd_cell rtl8380_mfd_devices[] = {
+static const struct mfd_cell rtl838x_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,maple-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,maple-port-led"),
@@ -105,13 +132,13 @@ static const struct mfd_cell rtl8380_mfd_devices[] = {
 		NULL, NULL, 0, 0, "realtek,maple-pinctrl"),
 };
 
-static const struct realtek_switchcore_data rtl8380_switchcore_data = {
-	.mfd_devices = rtl8380_mfd_devices,
-	.mfd_device_count = ARRAY_SIZE(rtl8380_mfd_devices),
-	.probe_model_name = rtl8380_probe_model_name,
+static const struct realtek_switchcore_data rtl838x_switchcore_data = {
+	.mfd_devices = rtl838x_mfd_devices,
+	.mfd_device_count = ARRAY_SIZE(rtl838x_mfd_devices),
+	.probe_model_name = rtl838x_probe_model_name,
 };
 
-static const struct mfd_cell rtl8390_mfd_devices[] = {
+static const struct mfd_cell rtl839x_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,cypress-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,cypress-port-led"),
@@ -121,20 +148,20 @@ static const struct mfd_cell rtl8390_mfd_devices[] = {
 		NULL, NULL, 0, 0, "realtek,cypress-pinctrl"),
 };
 
-static const struct realtek_switchcore_data rtl8390_switchcore_data = {
-	.mfd_devices = rtl8390_mfd_devices,
-	.mfd_device_count = ARRAY_SIZE(rtl8390_mfd_devices),
-	.probe_model_name = rtl8390_probe_model_name,
+static const struct realtek_switchcore_data rtl839x_switchcore_data = {
+	.mfd_devices = rtl839x_mfd_devices,
+	.mfd_device_count = ARRAY_SIZE(rtl839x_mfd_devices),
+	.probe_model_name = rtl839x_probe_model_name,
 };
 
 static const struct of_device_id of_realtek_switchcore_match[] = {
 	{
 		.compatible = "realtek,maple-switchcore",
-		.data = &rtl8380_switchcore_data,
+		.data = &rtl838x_switchcore_data,
 	},
 	{
 		.compatible = "realtek,cypress-switchcore",
-		.data = &rtl8390_switchcore_data,
+		.data = &rtl839x_switchcore_data,
 	},
 	{ /* sentinel */ }
 };
