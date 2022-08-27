@@ -50,8 +50,8 @@
 	};
 
 	mdio1: mdio {
-//		pinctrl-names = "default";
-//		pinctrl-0 = <&gpio_mdx_pins>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&aux_mdio_pins>;
 
 		compatible = "virtual,mdio-gpio";
 		#address-cells = <1>;
@@ -157,6 +157,30 @@
 	switchcore-bus@1b000000 {
 		compatible = "realtek,maple-switchcore", "syscon";
 		reg = <0x1b000000 0x10000>;
+
+		pinctrl {
+			compatible = "realtek,maple-pinctrl";
+
+			sys_led_pins: sys-led-mux {
+				groups = "sys-led";
+				function = "gpio";
+			};
+
+			aux_mdio_pins: aux-mdio-mux {
+				groups = "aux-mdio";
+				function = "gpio";
+			};
+
+			serial1_pins: uart1-mux {
+				groups = "serial1";
+				function = "serial1";
+			};
+
+			jtag_header_pins: jtag-mux {
+				groups = "jtag";
+				function = "gpio";
+			};
+		};
 
 		port-leds {
 			compatible = "realtek,maple-port-led";
@@ -383,43 +407,15 @@
 			};
 		};
 	};
-
-//	switchcore@1b000000 {
-//		compatible = "syscon", "simple-mfd";
-//		#address-cells = <1>;
-//		#size-cells = <1>;
-//		ranges = <0x0 0x1b000000 0x20000>;
-//
-//		pinctrl_sysled: pinmux@a000 {
-//			compatible = "pinctrl-single";
-//			reg = <0xa000 0x4>;
-//
-//			pinctrl-single,bit-per-mux;
-//			pinctrl-single,register-width = <32>;
-//			pinctrl-single,function-mask = <0x1>;
-//			#pinctrl-cells = <2>;
-//
-//			sys_led_pins: pinmux_sys_led_pins {
-//				pinctrl-single,bits = <0x0 0x0000 0x8000>;
-//			};
-//		};
-//
-//		pinctrl_gpio: pinmux@a0e0 {
-//			compatible = "pinctrl-single";
-//			reg = <0xa0e0 0x4>;
-//
-//			pinctrl-single,bit-per-mux;
-//			pinctrl-single,register-width = <32>;
-//			pinctrl-single,function-mask = <0x1>;
-//			#pinctrl-cells = <2>;
-//
-//			gpio_mdx_pins: pinmux_gpio_mdx_pins {
-//				pinctrl-single,bits = <0x0 0x0 0x1>;
-//			};
-//		};
-//	};
 };
 
 &serial0 {
 	status = "okay";
+};
+
+&serial1 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&serial1_pins>;
 };
