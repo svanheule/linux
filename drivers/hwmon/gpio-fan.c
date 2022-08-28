@@ -97,6 +97,27 @@ static int fan_alarm_init(struct gpio_fan_data *fan_data)
 				IRQF_SHARED, "GPIO fan alarm", fan_data);
 }
 
+static umode_t gpio_fan_alarm_is_visible(struct kobject *kobj, struct attribute *attr, int index)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct gpio_fan_data *data = dev_get_drvdata(dev);
+
+	if (!data->alarm_gpio)
+		return 0;
+
+	return attr->mode;
+}
+
+static struct attribute *gpio_fan_alarm_attributes[] = {
+	&dev_attr_fan1_alarm.attr,
+	NULL
+};
+
+static const struct attribute_group gpio_fan_alarm_group = {
+	.attrs = gpio_fan_alarm_attributes,
+	.is_visible = gpio_fan_alarm_is_visible,
+};
+
 /*
  * Control GPIOs.
  */
@@ -296,23 +317,19 @@ static DEVICE_ATTR_RO(fan1_max);
 static DEVICE_ATTR_RO(fan1_input);
 static DEVICE_ATTR(fan1_target, 0644, fan1_input_show, set_rpm);
 
-static umode_t gpio_fan_is_visible(struct kobject *kobj,
-				   struct attribute *attr, int index)
+static umode_t gpio_fan_ctrl_is_visible(struct kobject *kobj, struct attribute *attr, int index)
 {
 	struct device *dev = kobj_to_dev(kobj);
 	struct gpio_fan_data *data = dev_get_drvdata(dev);
 
-	if (index == 0 && !data->alarm_gpio)
-		return 0;
-	if (index > 0 && !data->gpios)
+	if (!data->gpios)
 		return 0;
 
 	return attr->mode;
 }
 
-static struct attribute *gpio_fan_attributes[] = {
-	&dev_attr_fan1_alarm.attr,		/* 0 */
-	&dev_attr_pwm1.attr,			/* 1 */
+static struct attribute *gpio_fan_ctrl_attributes[] = {
+	&dev_attr_pwm1.attr,
 	&dev_attr_pwm1_enable.attr,
 	&dev_attr_pwm1_mode.attr,
 	&dev_attr_fan1_input.attr,
@@ -322,13 +339,14 @@ static struct attribute *gpio_fan_attributes[] = {
 	NULL
 };
 
-static const struct attribute_group gpio_fan_group = {
-	.attrs = gpio_fan_attributes,
-	.is_visible = gpio_fan_is_visible,
+static const struct attribute_group gpio_fan_ctrl_group = {
+	.attrs = gpio_fan_ctrl_attributes,
+	.is_visible = gpio_fan_ctrl_is_visible,
 };
 
 static const struct attribute_group *gpio_fan_groups[] = {
-	&gpio_fan_group,
+	&gpio_fan_alarm_group,
+	&gpio_fan_ctrl_group,
 	NULL
 };
 
