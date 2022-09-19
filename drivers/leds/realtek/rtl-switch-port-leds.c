@@ -653,18 +653,16 @@ static int rtl_hw_trigger_assign(struct switch_port_led *led, int trigger)
 	u32 rtl_trigger;
 	int err;
 
+	rtl_trigger = cfg->trigger_xlate(led, trigger);
+	if (rtl_trigger < 0)
+		return rtl_trigger;
+
 	/*
 	 * Need to leave old group first, since we may need this to allocate a
 	 * new group. On assignment failure, this needs to be rolled back.
 	 */
-	if(led->current_group)
+	if (led->current_group)
 		bitmap_clear(led->current_group->ports, led->port, 1);
-
-	rtl_trigger = cfg->trigger_xlate(led, trigger);
-	if (rtl_trigger < 0) {
-		err = rtl_trigger;
-		goto err_out;
-	}
 
 	group = cfg->map_group(led, trigger);
 	if (IS_ERR(group)) {
@@ -688,7 +686,7 @@ static int rtl_hw_trigger_assign(struct switch_port_led *led, int trigger)
 	return 0;
 
 err_out:
-	if(led->current_group)
+	if (led->current_group)
 		bitmap_set(led->current_group->ports, led->port, 1);
 
 	return err;
@@ -717,17 +715,15 @@ static ssize_t rtl_hw_trigger_store(struct device *dev, struct device_attribute 
 
 	mutex_lock(&ctrl->lock);
 
-	if (!pled->current_group)
-		goto out;
+	if (pled->current_group) {
+		err = rtl_hw_trigger_assign(pled, value);
+		if (err)
+			goto out;
+	}
 
-	err = rtl_hw_trigger_assign(pled, value);
-	if (err)
-		goto err_out;
-
-out:
 	pled->trigger_flags = value;
 
-err_out:
+out:
 	mutex_unlock(&ctrl->lock);
 
 	if (err)
