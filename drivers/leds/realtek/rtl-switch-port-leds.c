@@ -182,6 +182,10 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 #define RTL8380_GROUP_SETTING_SHIFT(grp, idx)	\
 	(RTL8380_GROUP_SETTING_WIDTH * ((idx) + RTL8380_PORT_LED_COUNT * (grp)))
 
+#define RTL8380_PORT_COMBO_LOW			20
+#define RTL8380_PORT_COMBO_HIGH			24
+
+
 enum rtl83xx_port_trigger {
 	RTL83XX_TRIG_LINK_ACT		= 0,
 	RTL83XX_TRIG_LINK		= 1,
@@ -268,7 +272,7 @@ static int rtl8380_port_trigger_xlate(struct switch_port_led *led, u32 port_led_
 /*
  * Maple/RTL838x has two static groups:
  *   - group 0: ports 0-23
- *   - group 1: ports 24-27
+ *   - group 1: ports 24-27 (high combo ports)
  *
  * When both groups need the same setting, the generic implementation would
  * always return the first group. However, high ports can only be controlled
@@ -285,7 +289,7 @@ static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led 
 	if (rtl_trigger < 0)
 		return ERR_PTR(rtl_trigger);
 
-	if (led->port < 24)
+	if (led->port < RTL8380_PORT_COMBO_HIGH)
 		group = switch_port_led_get_group(led, 0);
 	else
 		group = switch_port_led_get_group(led, 1);
@@ -384,16 +388,16 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	 * extra LEDs depends on the number of ports that is enabled (LED wise)
 	 * in the applicable range.
 	 */
-	if (combo_port_min < 20) {
-		dev_err(ctrl->dev, "combo ports < 20 not supported\n");
+	if (combo_port_min < RTL8380_PORT_COMBO_LOW) {
+		dev_err(ctrl->dev, "combo ports < %d not supported\n", RTL8380_PORT_COMBO_LOW);
 		return -EINVAL;
 	}
-	if (combo_port_min < 24 && combo_port_max >= 24) {
+	if (combo_port_min < RTL8380_PORT_COMBO_HIGH && combo_port_max >= RTL8380_PORT_COMBO_HIGH) {
 		dev_err(ctrl->dev, "illegal combo port combination\n");
 		return -EINVAL;
 	}
 
-	if (combo_port_min < 24)
+	if (combo_port_min < RTL8380_PORT_COMBO_HIGH)
 		combo_port_val = 1;
 	else if (combo_port_min < ctrl->cfg->port_count)
 		combo_port_val = 2;
