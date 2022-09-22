@@ -59,6 +59,7 @@ static void rtl83xx_read_chip_info(struct regmap *map, unsigned int reg,
 
 	regmap_write(map, reg, FIELD_PREP(RTL_CHIP_INFO_UNLOCK, RTL_CHIP_INFO_UNLOCK_CODE));
 	regmap_read(map, reg, &val);
+	/* FIXME chip rev potentially different between maple/cypress */
 	*chip_rev = MODEL_NAME_CHAR(val, RTL_CHIP_INFO_CHIP_REV) ?: '0';
 	*rl_id = FIELD_GET(RTL_CHIP_INFO_RLID, val);
 }
