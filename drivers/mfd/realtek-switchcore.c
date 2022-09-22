@@ -115,6 +115,9 @@ static void rtl839x_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 	rtl_swcore_chip_print(ctrl->dev, model_id, model_char, chip_rev, rl_id);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)
+#define MFD_CELL_OF		OF_MFD_CELL
+#endif
 
 static const struct mfd_cell rtl838x_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,maple-sys-led"),
