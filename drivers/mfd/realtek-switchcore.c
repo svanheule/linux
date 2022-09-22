@@ -167,38 +167,23 @@ MODULE_DEVICE_TABLE(of, of_realtek_switchcore_match);
 static int realtek_switchcore_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
-	const struct of_device_id *match;
 	struct realtek_switchcore_ctrl *ctrl;
 
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl)
 		return -ENOMEM;
 
-	match = of_match_device(of_realtek_switchcore_match, dev);
-	if (match)
-		ctrl->data = (struct realtek_switchcore_data *) match->data;
-	else
-		return dev_err_probe(dev, -EINVAL, "no device match\n");
-
 	ctrl->dev = dev;
-
-	if (!np)
-		return dev_err_probe(dev, -ENODEV, "no DT node found\n");
-
-	ctrl->map = device_node_to_regmap(np);
+	ctrl->data = of_match_device_get_match_data(dev);
+	ctrl->map = syscon_node_to_regmap(dev->of_node);
 	if (!ctrl->map)
 		return dev_err_probe(dev, -ENXIO, "failed to get regmap\n");
 
 	if (ctrl->data->probe_model_name)
 		ctrl->data->probe_model_name(ctrl);
 
-	/* Find sub-devices */
-	if (ctrl->data->mfd_devices)
-		mfd_add_devices(dev, 0, ctrl->data->mfd_devices,
-			ctrl->data->mfd_device_count, NULL, 0, NULL);
-
-	return 0;
+	return mfd_add_devices(dev, 0, ctrl->data->mfd_devices,
+			       ctrl->data->mfd_device_count, NULL, 0, NULL);
 }
 
 static struct platform_driver realtek_switchcore_driver = {
