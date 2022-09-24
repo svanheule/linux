@@ -73,15 +73,16 @@ struct switch_port_led_config {
 	unsigned int group_count;
 	/* Whether the secondary (SFP cage) LEDs can be controlled separately */
 	bool independent_secondaries;
-	/* Port LED reg_field */
+	/* Port LED on/off/blink modes */
 	const struct regfield_led_modes *modes;
 	/* reg_field storing the index-specific user mode */
 	struct reg_field (*led_regfield)(unsigned int port, unsigned int index);
 	/* reg_field storing the index-specific offloaded group setting */
 	struct reg_field (*group_regfield)(unsigned int group, unsigned int index);
-	void (*led_commit)(struct regfield_led *led);
 	/* Configure and start the peripheral */
 	int (*init)(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode);
+	/* Optional - Latch the updated LED configuration */
+	void (*led_commit)(struct regfield_led *led);
 	/* Switch between HW offloading or user control */
 	int (*set_hw_managed)(struct switch_port_led *led, bool hw_managed);
 	/* Translate a generic trigger to a gen-specific one */
