@@ -161,9 +161,7 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 	return ERR_PTR(-ENOSPC);
 }
 
-/*
- * SoC specific implementation for RTL8380 series (Maple)
- */
+/* Maple registers */
 #define RTL8380_REG_LED_MODE_SEL		0x1004
 #define RTL8380_REG_LED_GLB_CTRL		0xa000
 #define RTL8380_GLB_CTRL_COMBO_MODE		GENMASK(8, 7)
@@ -183,7 +181,25 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 #define RTL8380_PORT_COMBO_LOW			20
 #define RTL8380_PORT_COMBO_HIGH			24
 
+/* Cypress registers */
+#define RTL8390_REG_LED_GLB_CTRL		0x00e4
+#define RTL8390_REG_LED_COPR_SET_SEL_CTRL(port)	(0x00f0 + 4 * ((port) / 16))
+#define RTL8390_REG_LED_FIB_SET_SEL_CTRL(port)	(0x0100 + 4 * ((port) / 16))
+#define RTL8390_REG_LED_COPR_PMASK_CTRL(port)	(0x0110 + 4 * ((port) / 32))
+#define RTL8390_REG_LED_FIB_PMASK_CTRL(port)	(0x0118 + 4 * ((port) / 32))
+#define RTL8390_REG_LED_COMBO_CTRL(port)	(0x0120 + 4 * ((port) / 32))
+#define RTL8390_REG_LED_SW_CTRL			0x0128
+#define RTL8390_REG_LED_SW_P_EN_CTRL(port)	(0x012c + 4 * ((port) / 10))
+#define RTL8390_REG_LED_SW_P_CTRL(port)		(0x0144 + 4 * (port))
 
+#define RTL8390_PORT_LED_COUNT			3
+#define RTL8390_SW_SETTING_WIDTH		3
+#define RTL8390_GROUP_SETTING_WIDTH		5
+#define RTL8390_GROUP_SETTING_REG(grp)		(0x00ec - 4 * ((grp) / 2))
+#define RTL8390_GROUP_SETTING_SHIFT(grp, idx)	\
+	(RTL8390_GROUP_SETTING_WIDTH * ((idx) + RTL8390_PORT_LED_COUNT * ((grp) % 2)))
+
+/* Maple and Cypress have mostly the same trigger configuration values */
 enum rtl83xx_port_trigger {
 	RTL83XX_TRIG_LINK_ACT		= 0,
 	RTL83XX_TRIG_LINK		= 1,
@@ -202,21 +218,6 @@ enum rtl83xx_port_trigger {
 	RTL83XX_TRIG_LINK_ACT_100M_10M	= 15,
 	RTL83XX_TRIG_LINK_ACT_10G	= 21,
 	RTL83XX_TRIG_DISABLED		= 31,
-};
-
-static const struct regfield_led_modes rtl8380_port_led_modes = {
-	.off = 0,
-	.on = 5,
-	/* Modes 6 and 7 appear to be a late additions to the list */
-	.blink  = {
-		{  32, 1},
-		{  64, 2},
-		{ 128, 3},
-		{ 256, 6},
-		{ 512, 4},
-		{1024, 7},
-		{ /* sentinel */ }
-	},
 };
 
 static int rtl83xx_port_trigger_xlate(u32 port_led_trigger)
@@ -259,6 +260,9 @@ static int rtl83xx_port_trigger_xlate(u32 port_led_trigger)
 	}
 }
 
+/*
+ * SoC specific implementation for RTL8380 series (Maple)
+ */
 static int rtl8380_port_trigger_xlate(struct switch_port_led *led, u32 port_led_trigger)
 {
 	if (port_led_trigger & (PTRG_LINK_2500 | PTRG_LINK_5000 | PTRG_LINK_10000))
@@ -432,6 +436,21 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	return err;
 }
 
+static const struct regfield_led_modes rtl8380_port_led_modes = {
+	.off = 0,
+	.on = 5,
+	/* Modes 6 and 7 appear to be a late additions to the list */
+	.blink  = {
+		{  32, 1},
+		{  64, 2},
+		{ 128, 3},
+		{ 256, 6},
+		{ 512, 4},
+		{1024, 7},
+		{ /* sentinel */ }
+	},
+};
+
 static const struct switch_port_led_config rtl8380_port_led_config = {
 	.port_count = 28,
 	.port_led_count = 3,
@@ -450,37 +469,6 @@ static const struct switch_port_led_config rtl8380_port_led_config = {
 /*
  * SoC specific implementation for RTL8390 series (Cypress)
  */
-#define RTL8390_REG_LED_GLB_CTRL		0x00e4
-#define RTL8390_REG_LED_COPR_SET_SEL_CTRL(port)	(0x00f0 + 4 * ((port) / 16))
-#define RTL8390_REG_LED_FIB_SET_SEL_CTRL(port)	(0x0100 + 4 * ((port) / 16))
-#define RTL8390_REG_LED_COPR_PMASK_CTRL(port)	(0x0110 + 4 * ((port) / 32))
-#define RTL8390_REG_LED_FIB_PMASK_CTRL(port)	(0x0118 + 4 * ((port) / 32))
-#define RTL8390_REG_LED_COMBO_CTRL(port)	(0x0120 + 4 * ((port) / 32))
-#define RTL8390_REG_LED_SW_CTRL			0x0128
-#define RTL8390_REG_LED_SW_P_EN_CTRL(port)	(0x012c + 4 * ((port) / 10))
-#define RTL8390_REG_LED_SW_P_CTRL(port)		(0x0144 + 4 * (port))
-
-#define RTL8390_PORT_LED_COUNT			3
-#define RTL8390_SW_SETTING_WIDTH		3
-#define RTL8390_GROUP_SETTING_WIDTH		5
-#define RTL8390_GROUP_SETTING_REG(grp)		(0x00ec - 4 * ((grp) / 2))
-#define RTL8390_GROUP_SETTING_SHIFT(grp, idx)	\
-	(RTL8390_GROUP_SETTING_WIDTH * ((idx) + RTL8390_PORT_LED_COUNT * ((grp) % 2)))
-
-static const struct regfield_led_modes rtl8390_port_led_modes = {
-	.off = 0,
-	.on = 7,
-	.blink = {
-		{  32, 1},
-		{  64, 2},
-		{ 128, 3},
-		{ 256, 4},
-		{ 512, 5},
-		{1024, 6},
-		{ /* sentinel */ }
-	},
-};
-
 static void rtl8390_port_led_commit(struct regfield_led *rled)
 {
 	const struct switch_port_led *led = container_of(rled, struct switch_port_led, led);
@@ -607,6 +595,20 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 
 	return err;
 }
+
+static const struct regfield_led_modes rtl8390_port_led_modes = {
+	.off = 0,
+	.on = 7,
+	.blink = {
+		{  32, 1},
+		{  64, 2},
+		{ 128, 3},
+		{ 256, 4},
+		{ 512, 5},
+		{1024, 6},
+		{ /* sentinel */ }
+	},
+};
 
 static const struct switch_port_led_config rtl8390_port_led_config = {
 	.port_count = 52,
