@@ -51,6 +51,7 @@ struct realtek_switchcore_ctrl {
 /* Cypress registers */
 #define RTL839X_REG_MODEL_NAME_INFO	0x0ff0
 #define RTL839X_REG_CHIP_INFO		0x0ff4
+/* TODO check if MODEL_NAME_INFO[6:1] matches CHIP_INFO::CHIP_VER */
 
 static void rtl83xx_read_chip_info(struct regmap *map, unsigned int reg,
 				      char *chip_rev, unsigned int *rl_id)
@@ -109,6 +110,7 @@ static void rtl839x_probe_model_name(const struct realtek_switchcore_ctrl *ctrl)
 	regmap_read(ctrl->map, RTL839X_REG_MODEL_NAME_INFO, &val);
 	model_id = FIELD_GET(GENMASK(31, 16), val);
 	model_char[0] = MODEL_NAME_CHAR(val, GENMASK(15, 11));
+	/* FIXME Only first char seems to be used/relevant */
 	model_char[1] = MODEL_NAME_CHAR(val, GENMASK(10, 6));
 
 	rtl83xx_read_chip_info(ctrl->map, RTL839X_REG_CHIP_INFO, &chip_rev, &rl_id);
@@ -123,6 +125,7 @@ static const struct mfd_cell rtl838x_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,maple-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,maple-port-led"),
+	/* TODO drop from initial version */
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
 		NULL, NULL, 0, 0, "realtek,maple-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
@@ -139,6 +142,7 @@ static const struct mfd_cell rtl839x_mfd_devices[] = {
 	MFD_CELL_OF("realtek-switchcore-sys-led", NULL, NULL, 0, 0, "realtek,cypress-sys-led"),
 	MFD_CELL_OF("realtek-switchcore-port-leds",
 		NULL, NULL, 0, 0, "realtek,cypress-port-led"),
+	/* TODO drop from initial version */
 	MFD_CELL_OF("realtek-switchcore-aux-mdio",
 		NULL, NULL, 0, 0, "realtek,cypress-aux-mdio"),
 	MFD_CELL_OF("realtek-switchcore-pinctrl",
