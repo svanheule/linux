@@ -507,12 +507,11 @@ int rtl8390_port_led_assign_group(struct switch_port_led *led, struct led_port_g
 
 static int rtl8390_port_led_set_hw_managed(struct switch_port_led *led, bool hw_managed)
 {
-	/* TODO Macro? */
-	u32 field_mask = BIT(3 * (led->port % 10) + led->index);
+	u32 port_field_mask = BIT(3 * (led->port % 10) + led->index);
 	int reg = RTL8390_REG_LED_SW_P_EN_CTRL(led->port);
-	u32 val = hw_managed ? 0 : field_mask;
+	u32 val = hw_managed ? 0 : port_field_mask;
 
-	return regmap_update_bits(led->ctrl->map, reg, field_mask, val);
+	return regmap_update_bits(led->ctrl->map, reg, port_field_mask, val);
 }
 
 static struct reg_field rtl8390_port_led_regfield(unsigned int port, unsigned int index)
