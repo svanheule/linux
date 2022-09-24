@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
+/*
+ * Base support for simple, monochromatic LEDs, configured by a short register
+ * field.  The register field should allow the LED to be turned on or off, or
+ * toggled at a predetermined rate with a 50% duty cycle.
+ */
 
 #include <linux/leds.h>
 #include <linux/property.h>
@@ -18,7 +23,7 @@ static void regfield_led_brightness_set(struct led_classdev *led_cdev,
 					enum led_brightness brightness)
 {
 	struct regfield_led *led = to_regfield_led(led_cdev);
-	bool turn_off = brightness == LED_OFF;
+	bool turn_off = brightness == 0;
 
 	if ((!led->active_low && turn_off) || (led->active_low && !turn_off))
 		regfield_led_set_mode(led, led->modes->off);
@@ -33,8 +38,8 @@ static enum led_brightness regfield_led_brightness_get(struct led_classdev *led_
 
 	regmap_field_read(led->field, &val);
 
-	if ((!led->active_low && val == led->modes->off) ||
-		(led->active_low && val == led->modes->on))
+	if ((!led->active_low && (val == led->modes->off)) ||
+		(led->active_low && (val == led->modes->on)))
 		return 0;
 	else
 		return 1;
