@@ -66,14 +66,7 @@ static int rtl_sys_led_probe(struct platform_device *pdev)
 	struct regmap *map;
 	int err;
 
-	field_data = device_get_match_data(dev);
-	if (!field_data)
-		return dev_err_probe(dev, -EINVAL, "no reg_field data\n");
-
-	if (!np)
-		return dev_err_probe(dev, -ENODEV, "no DT node found\n");
-
-	map = device_node_to_regmap(of_get_parent(np));
+	map = syscon_node_to_regmap(of_get_parent(dev->of_node));
 	if (!map)
 		return dev_err_probe(dev, -ENXIO, "failed to get regmap\n");
 
@@ -81,6 +74,7 @@ static int rtl_sys_led_probe(struct platform_device *pdev)
 	if (!led)
 		return -ENOMEM;
 
+	field_data = device_get_match_data(dev);
 	field = devm_regmap_field_alloc(dev, map, *field_data);
 	if (IS_ERR(field))
 		return dev_err_probe(dev, PTR_ERR(field), "register field allocation failed\n");
