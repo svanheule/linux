@@ -14,6 +14,16 @@
  * to manage a system LED, with two supported blinking rates.
  */
 
+#define RTL838X_REG_LED_GLB_CTRL		0xa000
+#define RTL839X_REG_LED_GLB_CTRL		0x00e4
+#define RTL930X_REG_LED_GLB_CTRL		0xcc00
+#define RTL931X_REG_LED_GLB_CTRL		0x0600
+
+static const struct reg_field rtl838x_sys_led_field = REG_FIELD(RTL838X_REG_LED_GLB_CTRL, 16, 17);
+static const struct reg_field rtl839x_sys_led_field = REG_FIELD(RTL839X_REG_LED_GLB_CTRL, 15, 16);
+static const struct reg_field rtl930x_sys_led_field = REG_FIELD(RTL930X_REG_LED_GLB_CTRL, 13, 14);
+static const struct reg_field rtl931x_sys_led_field = REG_FIELD(RTL931X_REG_LED_GLB_CTRL, 12, 13);
+
 static const struct regfield_led_modes rtl_sys_led_modes = {
 	.off = 0,
 	.on = 3,
@@ -24,11 +34,6 @@ static const struct regfield_led_modes rtl_sys_led_modes = {
 	},
 };
 
-static const struct reg_field rtl838x_sys_led_field = REG_FIELD(0xa000, 16, 17);
-static const struct reg_field rtl839x_sys_led_field = REG_FIELD(0x00e4, 15, 16);
-//static const struct reg_field rtl930x_sys_led_field = REG_FIELD();
-//static const struct reg_field rtl931x_sys_led_field = REG_FIELD();
-
 static const struct of_device_id of_rtl_sys_led_match[] = {
 	{
 		.compatible = "realtek,maple-sys-led",
@@ -37,6 +42,14 @@ static const struct of_device_id of_rtl_sys_led_match[] = {
 	{
 		.compatible = "realtek,cypress-sys-led",
 		.data = &rtl839x_sys_led_field,
+	},
+	{
+		.compatible = "realtek,longan-sys-led",
+		.data = &rtl930x_sys_led_field,
+	},
+	{
+		.compatible = "realtek,mango-sys-led",
+		.data = &rtl931x_sys_led_field,
 	},
 	{ /* sentinel */ }
 };
