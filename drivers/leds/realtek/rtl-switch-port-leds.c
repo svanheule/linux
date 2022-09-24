@@ -944,7 +944,7 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 					     (u32) of_n_size_cells(child));
 		}
 
-		if (!of_node_name_prefix(child, "led")) {
+		if (!of_node_name_eq(child, "led")) {
 			dev_dbg(dev, "skipping unsupported node %s\n", of_node_full_name(child));
 			continue;
 		}
