@@ -157,7 +157,7 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 	}
 
 	dev_warn(ctrl->dev, "no available group for (%d,%d,%d) with trigger 0x%02x\n",
-		led->port, led->index, led->is_secondary, rtl_trg);
+		 led->port, led->index, led->is_secondary, rtl_trg);
 	return ERR_PTR(-ENOSPC);
 }
 
@@ -298,7 +298,7 @@ static struct led_port_group *rtl8380_port_led_map_group(struct switch_port_led 
 
 	if (current_trigger != rtl_trigger && !bitmap_empty(group->ports, group->size)) {
 		dev_warn(ctrl->dev, "cannot map (%d,%d) to group %d: 0x%02x != 0x%02x\n",
-			led->port, led->index, group->index, current_trigger, rtl_trigger);
+			 led->port, led->index, group->index, current_trigger, rtl_trigger);
 		return ERR_PTR(-ENOSPC);
 	}
 
@@ -783,7 +783,7 @@ static int switch_port_register_classdev(struct switch_port_led *pled, struct fw
 	struct regmap_field *field;
 
 	field = devm_regmap_field_alloc(pled->ctrl->dev, pled->ctrl->map,
-			pled->ctrl->cfg->led_regfield(pled->port, pled->index));
+					pled->ctrl->cfg->led_regfield(pled->port, pled->index));
 	if (IS_ERR(field))
 		return PTR_ERR(field);
 
@@ -909,7 +909,8 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	if (!ctrl->groups)
 		return -ENOMEM;
 
-	ctrl->available_leds = devm_kcalloc(dev, ctrl->cfg->port_count, sizeof(*ctrl->available_leds), GFP_KERNEL);
+	ctrl->available_leds = devm_kcalloc(dev, ctrl->cfg->port_count,
+					    sizeof(*ctrl->available_leds), GFP_KERNEL);
 	if (!ctrl->available_leds)
 		return -ENOMEM;
 
@@ -938,13 +939,13 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 		if (of_n_addr_cells(child) != 3) {
 			of_node_put(child);
 			return dev_err_probe(dev, -EINVAL, "#address-cells (%d) is not 3\n",
-				(u32) of_n_addr_cells(child));
+					     (u32) of_n_addr_cells(child));
 		}
 
 		if (of_n_size_cells(child) != 0) {
 			of_node_put(child);
 			return dev_err_probe(dev, -EINVAL, "#size-cells (%d) is not 0\n",
-				(u32) of_n_size_cells(child));
+					     (u32) of_n_size_cells(child));
 		}
 
 		if (!of_node_name_prefix(child, "led")) {
