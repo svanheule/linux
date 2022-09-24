@@ -875,9 +875,6 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 
 	np = dev->of_node;
 
-//	if (!pdev->mfd_cell)
-//		return dev_err_probe(dev, -ENODEV, "must be instantiated as MFD child\n");
-
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl)
 		return -ENOMEM;
@@ -885,11 +882,8 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	mutex_init(&ctrl->lock);
 
 	ctrl->dev = dev;
-	ctrl->cfg = of_device_get_match_data(dev);
-	if (!ctrl->cfg)
-		return dev_err_probe(dev, -ENODEV, "failed to find matching data\n");
-
-	ctrl->map = device_node_to_regmap(of_get_parent(np));
+	ctrl->cfg = device_get_match_data(dev);
+	ctrl->map = syscon_node_to_regmap(of_get_parent(np));
 	if (IS_ERR_OR_NULL(ctrl->map))
 		return dev_err_probe(dev, PTR_ERR(ctrl->map), "failed to find parent regmap\n");
 
