@@ -373,7 +373,7 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 			combo_port_max = max(combo_port_max, port);
 		}
 
-		/* Enable a port if any LED is used, disable otherwise */
+		/* Enable a port if any of its LED are used */
 		err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_P_EN_CTRL, BIT(port), BIT(port));
 		if (err)
 			return err;
@@ -500,6 +500,7 @@ int rtl8390_port_led_assign_group(struct switch_port_led *led, struct led_port_g
 	else
 		reg_set = RTL8390_REG_LED_COPR_SET_SEL_CTRL(led->port);
 
+	/* FIXME remove dev_info() */
 	dev_info(led->ctrl->dev, "%04x & %08x <- %08x", reg_set, mask, val);
 	return regmap_update_bits(led->ctrl->map, reg_set, mask, val);
 }
