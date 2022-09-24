@@ -344,8 +344,8 @@ static struct reg_field rtl8380_port_led_group_regfield(unsigned int group, unsi
 static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
 {
 	const struct switch_port_led_mask *led_masks;
-	unsigned int led_enable_mask_high = 0;
-	unsigned int led_enable_mask_low = 0;
+	unsigned int led_possible_mask_high = 0;
+	unsigned int led_possible_mask_low = 0;
 	unsigned int combo_port_min = ctrl->cfg->port_count;
 	unsigned int combo_port_max = 0;
 	unsigned int combo_port_val = 0;
@@ -359,17 +359,16 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	regmap_write(ctrl->map, RTL8380_REG_LED_P_EN_CTRL, 0);
 
 	for (port = 0; port < ctrl->cfg->port_count; port++) {
-		/* Overlay all the individual masks */
 		led_masks = &ctrl->available_leds[port];
 		port_mask = led_masks->primary | led_masks->secondary;
 
 		if (!port_mask)
 			continue;
 
-		if (port < 24) /* FIXME replace with macro */
-			led_enable_mask_low |= port_mask;
+		if (port < RTL8380_PORT_COMBO_HIGH)
+			led_possible_mask_low |= port_mask;
 		else
-			led_enable_mask_high |= port_mask;
+			led_possible_mask_high |= port_mask;
 
 		if (led_masks->primary && led_masks->secondary) {
 			combo_port_min = min(combo_port_min, port);
@@ -385,9 +384,10 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	/*
 	 * Combo ports are allowed in either [20, 23] or [24, 27].
 	 * Setting the combo port field to a non-zero value, will cause extra
-	 * LED values to be scanned out at the end of the chain. The number of
-	 * extra LEDs depends on the number of ports that is enabled (LED wise)
-	 * in the applicable range.
+	 * LED values to be scanned out. The field value determines if these
+	 * follow the primary LED data for port 23 of 27. The number of extra
+	 * LEDs depends on the number of ports that is enabled (LED wise) in
+	 * the applicable range.
 	 */
 	if (combo_port_min < RTL8380_PORT_COMBO_LOW) {
 		dev_err(ctrl->dev, "combo ports < %d not supported\n", RTL8380_PORT_COMBO_LOW);
@@ -414,17 +414,17 @@ static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 	 * none of the LEDs are used. If no LEDs are configured, we must use the
 	 * value of the low port mask.
 	 */
-	if (!led_enable_mask_high)
-		led_enable_mask_high = led_enable_mask_low;
+	if (!led_possible_mask_high)
+		led_possible_mask_high = led_possible_mask_low;
 
-	if (led_enable_mask_low)
-		led_enable_mask_low = GENMASK(fls(led_enable_mask_low) - 1, 0);
-	if (led_enable_mask_high)
-		led_enable_mask_high = GENMASK(fls(led_enable_mask_high) - 1, 0);
+	if (led_possible_mask_low)
+		led_possible_mask_low = GENMASK(fls(led_possible_mask_low) - 1, 0);
+	if (led_possible_mask_high)
+		led_possible_mask_high = GENMASK(fls(led_possible_mask_high) - 1, 0);
 
 	glb_ctrl_mask |= RTL8380_GLB_CTRL_HIGH_PORTS | RTL8380_GLB_CTRL_LOW_PORTS;
-	glb_ctrl_val |= FIELD_PREP(RTL8380_GLB_CTRL_LOW_PORTS, led_enable_mask_low);
-	glb_ctrl_val |= FIELD_PREP(RTL8380_GLB_CTRL_HIGH_PORTS, led_enable_mask_high);
+	glb_ctrl_val |= FIELD_PREP(RTL8380_GLB_CTRL_LOW_PORTS, led_possible_mask_low);
+	glb_ctrl_val |= FIELD_PREP(RTL8380_GLB_CTRL_HIGH_PORTS, led_possible_mask_high);
 
 	err = regmap_update_bits(ctrl->map, RTL8380_REG_LED_GLB_CTRL, glb_ctrl_mask, glb_ctrl_val);
 	if (err)
