@@ -141,17 +141,14 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 {
 	struct switch_port_led_ctrl *ctrl = led->ctrl;
 	int rtl_trg = ctrl->cfg->trigger_xlate(led, trigger);
-	struct led_port_group *group;
 	u32 current_trg;
-	unsigned int i;
-	int err;
 
 	if (rtl_trg < 0)
 		return ERR_PTR(rtl_trg);
 
-	for (i = 0; i < led->ctrl->cfg->group_count; i++) {
-		group = switch_port_led_get_group(led, i);
-		err = regmap_field_read(group->setting, &current_trg);
+	for (unsigned int i = 0; i < led->ctrl->cfg->group_count; i++) {
+		struct led_port_group *group = switch_port_led_get_group(led, i);
+		int err = regmap_field_read(group->setting, &current_trg);
 		if (err)
 			return ERR_PTR(err);
 
@@ -343,24 +340,21 @@ static struct reg_field rtl8380_port_led_group_regfield(unsigned int group, unsi
 
 static int rtl8380_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
 {
-	const struct switch_port_led_mask *led_masks;
 	unsigned int led_possible_mask_high = 0;
 	unsigned int led_possible_mask_low = 0;
 	unsigned int combo_port_min = ctrl->cfg->port_count;
 	unsigned int combo_port_max = 0;
 	unsigned int combo_port_val = 0;
-	unsigned int port;
 	u32 glb_ctrl_mask;
 	u32 glb_ctrl_val;
-	u32 port_mask;
 	int err;
 
 	/* Disable all LEDs, (re-)enable when configuring */
 	regmap_write(ctrl->map, RTL8380_REG_LED_P_EN_CTRL, 0);
 
-	for (port = 0; port < ctrl->cfg->port_count; port++) {
-		led_masks = &ctrl->available_leds[port];
-		port_mask = led_masks->primary | led_masks->secondary;
+	for (unsigned int port = 0; port < ctrl->cfg->port_count; port++) {
+		const struct switch_port_led_mask *led_masks = &ctrl->available_leds[port];
+		u32 port_mask = led_masks->primary | led_masks->secondary;
 
 		if (!port_mask)
 			continue;
@@ -875,7 +869,6 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	struct led_port_group *group;
 	struct switch_port_led *pled;
 	const char *mode_name;
-	int i_grp, i_led;
 	int err;
 
 	np = dev->of_node;
@@ -920,8 +913,8 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	if (!ctrl->available_leds)
 		return -ENOMEM;
 
-	for (i_grp = 0; i_grp < ctrl->cfg->group_count; i_grp++) {
-		for (i_led = 0; i_led < ctrl->cfg->port_led_count; i_led++) {
+	for (unsigned int i_grp = 0; i_grp < ctrl->cfg->group_count; i_grp++) {
+		for (unsigned int i_led = 0; i_led < ctrl->cfg->port_led_count; i_led++) {
 			group_field = ctrl->cfg->group_regfield(i_grp, i_led);
 
 			group = &ctrl->groups[GROUP_LIST_INDEX(ctrl->cfg, i_grp, i_led)];
