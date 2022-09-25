@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 
-#include <linux/bitfield.h>
-#include <linux/bitops.h>
 #include <linux/bits.h>
+#include <linux/bitfield.h>
 #include <linux/leds.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/syscon.h>
