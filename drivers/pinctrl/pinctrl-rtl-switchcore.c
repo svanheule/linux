@@ -302,12 +302,11 @@ static int rtl_swcore_set_mux(struct pinctrl_dev *pctldev, unsigned int selector
 	const struct rtl_swcore_function_desc *function;
 	const struct rtl_swcore_mux_setting *setting;
 	const struct rtl_swcore_mux_desc *mux;
-	unsigned int i;
 
 	function = &priv->config->functions[selector];
 	mux = priv->config->groups[group];
 
-	for (i = 0; i < function->nsettings; i++) {
+	for (unsigned int i = 0; i < function->nsettings; i++) {
 		setting = &function->settings[i];
 		if (setting->mux == mux)
 			return regmap_field_write(priv->mux_fields[group], setting->value);
@@ -379,7 +378,6 @@ static int rtl_swcore_pinctrl_probe(struct platform_device *pdev)
 	struct pinctrl_dev *pctldev;
 	struct regmap_field *field;
 	struct regmap *regmap;
-	int mux;
 	int err;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -408,7 +406,7 @@ static int rtl_swcore_pinctrl_probe(struct platform_device *pdev)
 	if (!priv->mux_fields)
 		return -ENOMEM;
 
-	for (mux = 0; mux < config->ngroups; mux++) {
+	for (unsigned int mux = 0; mux < config->ngroups; mux++) {
 		field = devm_regmap_field_alloc(dev, regmap, config->groups[mux]->field);
 		if (IS_ERR(field))
 			return PTR_ERR(field);
