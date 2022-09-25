@@ -304,18 +304,13 @@ static int rtl_swcore_set_mux(struct pinctrl_dev *pctldev, unsigned int selector
 	const struct rtl_swcore_mux_desc *mux;
 	unsigned int i;
 
-	dev_info(priv->dev, "requesting selector %d, group %d\n", selector, group);
-
 	function = &priv->config->functions[selector];
 	mux = priv->config->groups[group];
 
 	for (i = 0; i < function->nsettings; i++) {
 		setting = &function->settings[i];
-		if (setting->mux == mux) {
-			dev_info(priv->dev, "set mux %s to function %s (%d)\n",
-				mux->name, function->name, setting->value);
+		if (setting->mux == mux)
 			return regmap_field_write(priv->mux_fields[group], setting->value);
-		}
 	}
 
 	/* Should never hit this, unless something was misconfigured */
@@ -349,8 +344,6 @@ static int rtl_swcore_functions_init(struct pinctrl_dev *pctl, struct rtl_swcore
 	for (f_idx = 0; f_idx < priv->config->nfunctions; f_idx++) {
 		function = &priv->config->functions[f_idx];
 		ngroups = function->nsettings;
-
-		dev_info(priv->dev, "found %d groups for function %s\n", ngroups, function->name);
 
 		groups = devm_kcalloc(priv->dev, ngroups, sizeof(*groups), GFP_KERNEL);
 		if (!groups)
