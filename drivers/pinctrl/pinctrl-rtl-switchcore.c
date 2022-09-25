@@ -276,8 +276,7 @@ static int rtl_swcore_group_count(struct pinctrl_dev *pctldev)
 	return priv->config->ngroups;
 }
 
-static const char * rtl_swcore_group_name(struct pinctrl_dev *pctldev,
-	unsigned int selector)
+static const char * rtl_swcore_group_name(struct pinctrl_dev *pctldev, unsigned int selector)
 {
 	struct rtl_swcore_pinctrl *priv = pinctrl_dev_get_drvdata(pctldev);
 
@@ -296,8 +295,8 @@ static int rtl_swcore_group_pins(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
-static int rtl_swcore_set_mux(struct pinctrl_dev *pctldev,
-	unsigned int selector, unsigned int group)
+static int rtl_swcore_set_mux(struct pinctrl_dev *pctldev, unsigned int selector,
+			      unsigned int group)
 {
 	struct rtl_swcore_pinctrl *priv = pinctrl_dev_get_drvdata(pctldev);
 	const struct rtl_swcore_function_desc *function;
@@ -412,7 +411,7 @@ static int rtl_swcore_pinctrl_probe(struct platform_device *pdev)
 	priv->pdesc.npins = config->npins;
 
 	priv->mux_fields = devm_kcalloc(dev, config->ngroups, sizeof(*priv->mux_fields),
-		GFP_KERNEL);
+					GFP_KERNEL);
 	if (!priv->mux_fields)
 		return -ENOMEM;
 
