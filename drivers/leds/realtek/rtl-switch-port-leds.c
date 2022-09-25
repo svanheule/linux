@@ -866,8 +866,6 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 	struct device_node *np, *child;
 	unsigned int member_map_count;
 	enum rtl_led_output_mode mode;
-	struct reg_field group_field;
-	struct led_port_group *group;
 	struct switch_port_led *pled;
 	const char *mode_name;
 	int err;
@@ -911,7 +909,8 @@ static int realtek_port_led_probe(struct platform_device *pdev)
 
 	for (unsigned int i_grp = 0; i_grp < ctrl->cfg->group_count; i_grp++) {
 		for (unsigned int i_led = 0; i_led < ctrl->cfg->port_led_count; i_led++) {
-			group_field = ctrl->cfg->group_regfield(i_grp, i_led);
+			struct reg_field group_field = ctrl->cfg->group_regfield(i_grp, i_led);
+			struct led_port_group *group;
 
 			group = &ctrl->groups[GROUP_LIST_INDEX(ctrl->cfg, i_grp, i_led)];
 			group->index = i_grp;
