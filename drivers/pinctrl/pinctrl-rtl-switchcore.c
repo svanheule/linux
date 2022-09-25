@@ -180,8 +180,18 @@ static const struct rtl_swcore_config rtl838x_config = {
  *   - ROW: {1..26} -> {0..25}
  *   - COL: {A..AF} -> {0..25}
  *
+ *     ROW |  1  2  3  4  5  6  7  8  9 10 11 12 13
+ *     COL |  A  B  C  D  E  F  G  H  J  K  L  M  N
+ *   ------|---------------------------------------
+ *   INDEX |  0  1  2  3  4  5  6  7  8  9 10 11 12
+ *
+ *     ROW | 14 15 16 17 18 19 20 21 22 23 24 25 26
+ *     COL |  P  R  T  U  V  W  Y AA AB AC AD AE AF
+ *   ------|---------------------------------------
+ *   INDEX | 13 14 15 16 17 18 19 20 21 22 23 24 25
+ *
  * Since there are no datasheets available, use a virtual pin range starting at
- * 676 for pins with unknowns positions. When actual pin positions are found
+ * 676 for pins with unknown positions. When actual pin positions are found
  * (if ever), these can the be mapped to their real values.
  */
 #define RTL839X_VPIN(num)		(26 * 26 + (num))
