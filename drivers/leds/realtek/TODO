@@ -1,0 +1,5 @@
+* Changing the HW offloading state will affect both the primary and secondary
+  LEDs of a port. This is currently not propagated, leaving the sibbling LED
+  with an incorrect trigger value.
+* Reading the LED brightness will always return the user-controlled brightness
+  setting. When HW offloading is active, this value may be incorrect.
