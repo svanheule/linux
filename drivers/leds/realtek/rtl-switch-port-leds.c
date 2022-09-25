@@ -182,6 +182,9 @@ static struct led_port_group *rtl_generic_port_led_map_group(struct switch_port_
 
 /* Cypress registers */
 #define RTL8390_REG_LED_GLB_CTRL		0x00e4
+#define RTL8390_GLB_CTRL_LED_EN			BIT(5)
+#define RTL8390_GLB_CTRL_LED_NUM_SEL		GENMASK(3, 2)
+#define RTL8390_GLB_CTRL_LED_IF_SEL		GENMASK(1, 0)
 #define RTL8390_REG_LED_COPR_SET_SEL_CTRL(port)	(0x00f0 + 4 * ((port) / 16))
 #define RTL8390_REG_LED_FIB_SET_SEL_CTRL(port)	(0x0100 + 4 * ((port) / 16))
 #define RTL8390_REG_LED_COPR_PMASK_CTRL(port)	(0x0110 + 4 * ((port) / 32))
@@ -531,10 +534,7 @@ static struct reg_field rtl8390_port_led_group_regfield(unsigned int group, unsi
 
 static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led_output_mode mode)
 {
-	static const u32 output_mode_mask = GENMASK(1, 0);
-	static const u32 led_count_mask = GENMASK(3, 2);
 	struct switch_port_led_mask *led_mask;
-	static const u32 enable = BIT(5);
 	u32 led_count = 0;
 	unsigned int port;
 	u32 reg_mask;
@@ -584,10 +584,12 @@ static int rtl8390_port_led_init(struct switch_port_led_ctrl *ctrl, enum rtl_led
 			return err;
 	}
 
-	reg_mask = enable | led_count_mask | output_mode_mask;
-	reg_val = enable;
-	reg_val |= FIELD_PREP(led_count_mask, led_count);
-	reg_val |= FIELD_PREP(output_mode_mask, mode);
+	reg_mask = RTL8390_GLB_CTRL_LED_EN;
+	reg_mask |= RTL8390_GLB_CTRL_LED_NUM_SEL;
+	reg_mask |= RTL8390_GLB_CTRL_LED_IF_SEL;
+	reg_val = RTL8390_GLB_CTRL_LED_EN;
+	reg_val |= FIELD_PREP(RTL8390_GLB_CTRL_LED_NUM_SEL, led_count);
+	reg_val |= FIELD_PREP(RTL8390_GLB_CTRL_LED_IF_SEL, mode);
 	err = regmap_update_bits(ctrl->map, RTL8390_REG_LED_GLB_CTRL, reg_mask, reg_val);
 
 	ctrl_dump_registers(ctrl, 0x00e0, 0x0214);
